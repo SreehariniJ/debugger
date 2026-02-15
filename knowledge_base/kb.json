@@ -1,0 +1,159 @@
+{
+  "core": {
+    "SyntaxError": {
+      "category": "Syntax",
+      "explanation": "Python couldn't parse this line. Usually means a character is missing or misplaced.",
+      "suggestion": "Add missing colon (:)",
+      "examples": {
+        "python": "print('Hello World'",
+        "js": "console.log('Hello World'"
+      }
+    },
+    "IndentationError": {
+      "category": "Syntax",
+      "explanation": "The code block is not aligned correctly with the previous statement.",
+      "suggestion": "Ensure the block is indented with 4 spaces or 1 tab.",
+      "examples": {
+        "python": "def f():\n    print('hi')",
+        "js": "function f() {\n    console.log('hi');}"
+      }
+    },
+    "NameError": {
+      "category": "Runtime",
+      "explanation": "The code refers to a local or global name that is not defined.",
+      "suggestion": "Check if the variable or function name is spelled correctly.",
+      "examples": {
+        "python": "print(x)",
+        "js": "console.log(x);"
+      }
+    },
+    "TypeError": {
+      "category": "Runtime",
+      "explanation": "An operation or function is applied to an object of inappropriate type.",
+      "suggestion": "Check variable types (e.g., ensure you aren't adding a string to a number).",
+      "examples": {
+        "python": "5 + 'hello'",
+        "js": "5 + 'hello'"
+      }
+    },
+    "AttributeError": {
+      "category": "Runtime",
+      "explanation": "An invalid reference was made to an attribute or method of an object.",
+      "suggestion": "Verify that the object has the attribute you are trying to access.",
+      "examples": {
+        "python": "''.non_existing_method()",
+        "js": "''.nonExistingMethod()"
+      }
+    },
+    "IndexError": {
+      "category": "Runtime",
+      "explanation": "The code tries to access an index that is out of the range of a sequence.",
+      "suggestion": "Ensure the index is within the valid range for the list, tuple, or string.",
+      "examples": {
+        "python": "lst = [1,2]; print(lst[2])",
+        "js": "let arr = [1,2]; console.log(arr[2]);"
+      }
+    },
+    "ZeroDivisionError": {
+      "category": "Runtime",
+      "explanation": "Division or modulo by zero is attempted.",
+      "suggestion": "Ensure the denominator is not zero before performing division.",
+      "examples": {
+        "python": "5/0",
+        "js": "5/0"
+      }
+    },
+    "KeyError": {
+      "category": "Runtime",
+      "explanation": "A dictionary key is not found in the set of existing keys.",
+      "suggestion": "Check that the key exists in the dictionary before accessing it.",
+      "examples": {
+        "python": "d = {'a':1}; print(d['b'])",
+        "js": "let d = {'a':1}; console.log(d['b']);"
+      }
+    },
+    "UnusedVariable": {
+      "category": "Logic/Best Practice",
+      "explanation": "Variable is assigned but never used.",
+      "suggestion": "Remove unused variables or use them appropriately.",
+      "examples": {
+        "python": "x = 5",
+        "js": "let x = 5;"
+      }
+    }
+  },
+  "secondary": {
+    "ImportError": {
+      "category": "Runtime",
+      "explanation": "The requested module could not be found or loaded.",
+      "suggestion": "Check if the library is installed or if the filename is correct.",
+      "examples": {
+        "python": "import non_existing_module",
+        "js": "import { something } from 'non-existing';"
+      }
+    },
+    "ModuleNotFoundError": {
+      "category": "Runtime",
+      "explanation": "The specified module cannot be found.",
+      "suggestion": "Install the missing module or check the import path.",
+      "examples": {
+        "python": "import missing_module",
+        "js": "import missingModule from 'missing';"
+      }
+    },
+    "ValueError": {
+      "category": "Runtime",
+      "explanation": "An operation receives an argument of the right type but an inappropriate value.",
+      "suggestion": "Check the values being passed to functions and ensure they are valid.",
+      "examples": {
+        "python": "int('abc')",
+        "js": "parseInt('abc')"
+      }
+    },
+    "RuntimeWarning": {
+      "category": "Runtime",
+      "explanation": "Indicates a runtime condition that isn’t necessarily an error but could lead to problems.",
+      "suggestion": "Review the code and handle potential edge cases to avoid issues.",
+      "examples": {
+        "python": "import warnings\nwarnings.warn('This is a warning')",
+        "js": "console.warn('This is a warning');"
+      }
+    },
+    "exec-used (W0122)": {
+      "category": "Security/Warning",
+      "explanation": "Raised when the 'exec' statement is used. It's dangerous with user input.",
+      "suggestion": "Review the code context and ensure proper usage.",
+      "examples": {
+        "python": "exec('print(5)')",
+        "js": "eval('console.log(5)');"
+      }
+    }
+  },
+  "patterns": {
+    "TypeError": ["<num> + '<string>'", "<array>.push('<string>')"],
+    "AttributeError": ["<object>.non_existing_method()"],
+    "IndexError": ["<list>[<out_of_range_index>]"],
+    "KeyError": ["<dict>['<missing_key>']"]
+  },
+  "ReferenceError": {
+    "category": "Runtime",
+    "explanation": "A variable is being used before it is defined.",
+    "suggestion": "Declare the variable before using it.",
+    "examples": {
+        "js": "console.log(b);"
+    }
+
+    },
+    "TypeError": {
+      "category": "Runtime",
+      "explanation": "An operation is applied to an inappropriate type.",
+      "suggestion": "Check the variable types before operation."
+    },
+    "SyntaxError": {
+      "category": "Syntax",
+      "explanation": "JS code contains invalid syntax.",
+      "suggestion": "Check syntax, missing brackets, semicolons, etc."
+    }
+  }
+
+

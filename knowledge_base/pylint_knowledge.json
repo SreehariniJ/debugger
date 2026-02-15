@@ -1,0 +1,980 @@
+[
+    {
+        "error_code": "I0023",
+        "name": "use-symbolic-message-instead",
+        "message_template": "%s",
+        "description": "Used when a message is enabled or disabled by id."
+    },
+    {
+        "error_code": "W0511",
+        "name": "fixme",
+        "message_template": "%s",
+        "description": "Used when a warning note as FIXME or XXX is detected."
+    },
+    {
+        "error_code": "W1401",
+        "name": "anomalous-backslash-in-string",
+        "message_template": "Anomalous backslash in string: '%s'. String constant might be missing an r prefix.",
+        "description": "Used when a backslash is in a literal string but not as an escape."
+    },
+    {
+        "error_code": "W1402",
+        "name": "anomalous-unicode-escape-in-string",
+        "message_template": "Anomalous Unicode escape in byte string: '%s'. String constant might be missing an r or u prefix.",
+        "description": "Used when an escape like \\u is encountered in a byte string where it has no effect."
+    },
+    {
+        "error_code": "W1404",
+        "name": "implicit-str-concat",
+        "message_template": "Implicit string concatenation found in %s",
+        "description": "String literals are implicitly concatenated in a literal iterable definition : maybe a comma is missing ?"
+    },
+    {
+        "error_code": "W1405",
+        "name": "inconsistent-quotes",
+        "message_template": "Quote delimiter %s is inconsistent with the rest of the file",
+        "description": "Quote delimiters are not used consistently throughout a module (with allowances made for avoiding unnecessary escaping)."
+    },
+    {
+        "error_code": "W1406",
+        "name": "redundant-u-string-prefix",
+        "message_template": "The u prefix for strings is no longer necessary in Python >=3.0",
+        "description": "Used when we detect a string with a u prefix. These prefixes were necessary in Python 2 to indicate a string was Unicode, but since Python 3.0 strings are Unicode by default."
+    },
+    {
+        "error_code": "E1901",
+        "name": "bare-name-capture-pattern",
+        "message_template": "The name capture `case %s` makes the remaining patterns unreachable. Use a dotted name (for example an enum) to fix this.",
+        "description": "Emitted when a name capture pattern is used in a match statement and there are case statements below it."
+    },
+    {
+        "error_code": "E1902",
+        "name": "invalid-match-args-definition",
+        "message_template": "`__match_args__` must be a tuple of strings.",
+        "description": "Emitted if `__match_args__` isn't a tuple of strings required for match."
+    },
+    {
+        "error_code": "E1903",
+        "name": "too-many-positional-sub-patterns",
+        "message_template": "%s expects %d positional sub-patterns (given %d)",
+        "description": "Emitted when the number of allowed positional sub-patterns exceeds the number of allowed sub-patterns specified in `__match_args__`."
+    },
+    {
+        "error_code": "E1904",
+        "name": "multiple-class-sub-patterns",
+        "message_template": "Multiple sub-patterns for attribute %s",
+        "description": "Emitted when there is more than one sub-pattern for a specific attribute in a class pattern."
+    },
+    {
+        "error_code": "R1905",
+        "name": "match-class-bind-self",
+        "message_template": "Use '%s() as %s' instead",
+        "description": "Match class patterns are faster if the name binding happens for the whole pattern and any lookup for `__match_args__` can be avoided."
+    },
+    {
+        "error_code": "R1906",
+        "name": "match-class-positional-attributes",
+        "message_template": "Use keyword attributes instead of positional ones (%s)",
+        "description": "Keyword attributes are more explicit and slightly faster since CPython can skip the `__match_args__` lookup."
+    },
+    {
+        "error_code": "W2402",
+        "name": "non-ascii-file-name",
+        "message_template": "%s name \"%s\" contains a non-ASCII character.",
+        "description": "Under python 3.5, PEP 3131 allows non-ascii identifiers, but not non-ascii file names.Since Python 3.5, even though Python supports UTF-8 files, some editors or tools don't."
+    },
+    {
+        "error_code": "E2501",
+        "name": "invalid-unicode-codec",
+        "message_template": "UTF-16 and UTF-32 aren't backward compatible. Use UTF-8 instead",
+        "description": "For compatibility use UTF-8 instead of UTF-16/UTF-32. See also https://bugs.python.org/issue1503789 for a history of this issue. And https://softwareengineering.stackexchange.com/questions/102205/ for some possible problems when using UTF-16 for instance."
+    },
+    {
+        "error_code": "E2502",
+        "name": "bidirectional-unicode",
+        "message_template": "Contains control characters that can permit obfuscated code executed differently than displayed",
+        "description": "bidirectional unicode are typically not displayed characters required to display right-to-left (RTL) script (i.e. Chinese, Japanese, Arabic, Hebrew, ...) correctly. So can you trust this code? Are you sure it displayed correctly in all editors? If you did not write it or your language is not RTL, remove the special characters, as they could be used to trick you into executing code, that does something else than what it looks like.\nMore Information:\nhttps://en.wikipedia.org/wiki/Bidirectional_text\nhttps://trojansource.codes/"
+    },
+    {
+        "error_code": "C2503",
+        "name": "bad-file-encoding",
+        "message_template": "PEP8 recommends UTF-8 as encoding for Python files",
+        "description": "PEP8 recommends UTF-8 default encoding for Python files. See https://peps.python.org/pep-0008/#source-file-encoding"
+    },
+    {
+        "error_code": "E1133",
+        "name": "not-an-iterable",
+        "message_template": "Non-iterable value %s is used in an iterating context",
+        "description": "Used when a non-iterable value is used in place where iterable is expected"
+    },
+    {
+        "error_code": "E1134",
+        "name": "not-a-mapping",
+        "message_template": "Non-mapping value %s is used in a mapping context",
+        "description": "Used when a non-mapping value is used in place where mapping is expected"
+    },
+    {
+        "error_code": "W3101",
+        "name": "missing-timeout",
+        "message_template": "Missing timeout argument for method '%s' can cause your program to hang indefinitely",
+        "description": "Used when a method needs a 'timeout' parameter in order to avoid waiting for a long time. If no timeout is specified explicitly the default value is used. For example for 'requests' the program will never time out (i.e. hang indefinitely)."
+    },
+    {
+        "error_code": "E3102",
+        "name": "positional-only-arguments-expected",
+        "message_template": "`%s()` got some positional-only arguments passed as keyword arguments: %s",
+        "description": "Emitted when positional-only arguments have been passed as keyword arguments. Remove the keywords for the affected arguments in the function call."
+    },
+    {
+        "error_code": "C0401",
+        "name": "wrong-spelling-in-comment",
+        "message_template": "Wrong spelling of a word '%s' in a comment:\n%s\n%s\nDid you mean: '%s'?",
+        "description": "Used when a word in comment is not spelled correctly."
+    },
+    {
+        "error_code": "C0402",
+        "name": "wrong-spelling-in-docstring",
+        "message_template": "Wrong spelling of a word '%s' in a docstring:\n%s\n%s\nDid you mean: '%s'?",
+        "description": "Used when a word in docstring is not spelled correctly."
+    },
+    {
+        "error_code": "C0403",
+        "name": "invalid-characters-in-docstring",
+        "message_template": "Invalid characters %r in a docstring",
+        "description": "Used when a word in docstring cannot be checked by enchant."
+    },
+    {
+        "error_code": "C2801",
+        "name": "unnecessary-dunder-call",
+        "message_template": "Unnecessarily calls dunder method %s. %s.",
+        "description": "Used when a dunder method is manually called instead of using the corresponding function/method/operator."
+    },
+    {
+        "error_code": "W3601",
+        "name": "bad-chained-comparison",
+        "message_template": "Suspicious %s-part chained comparison using semantically incompatible operators (%s)",
+        "description": "Used when there is a chained comparison where one expression is part of two comparisons that belong to different semantic groups (\"<\" does not mean the same thing as \"is\", chaining them in \"0 < x is None\" is probably a mistake)."
+    },
+    {
+        "error_code": "C3001",
+        "name": "unnecessary-lambda-assignment",
+        "message_template": "Lambda expression assigned to a variable. Define a function using the \"def\" keyword instead.",
+        "description": "Used when a lambda expression is assigned to variable rather than defining a standard function with the \"def\" keyword."
+    },
+    {
+        "error_code": "C3002",
+        "name": "unnecessary-direct-lambda-call",
+        "message_template": "Lambda expression called directly. Execute the expression inline instead.",
+        "description": "Used when a lambda expression is directly called rather than executing its contents inline."
+    },
+    {
+        "error_code": "E1700",
+        "name": "yield-inside-async-function",
+        "message_template": "Yield inside async function",
+        "description": "Used when an `yield` or `yield from` statement is found inside an async function."
+    },
+    {
+        "error_code": "E1701",
+        "name": "not-async-context-manager",
+        "message_template": "Async context manager '%s' doesn't implement __aenter__ and __aexit__.",
+        "description": "Used when an async context manager is used with an object that does not implement the async context management protocol."
+    },
+    {
+        "error_code": "W4701",
+        "name": "modified-iterating-list",
+        "message_template": "Iterated list '%s' is being modified inside for loop body, consider iterating through a copy of it instead.",
+        "description": "Emitted when items are added or removed to a list being iterated through. Doing so can result in unexpected behaviour, that is why it is preferred to use a copy of the list."
+    },
+    {
+        "error_code": "E4702",
+        "name": "modified-iterating-dict",
+        "message_template": "Iterated dict '%s' is being modified inside for loop body, iterate through a copy of it instead.",
+        "description": "Emitted when items are added or removed to a dict being iterated through. Doing so raises a RuntimeError."
+    },
+    {
+        "error_code": "E4703",
+        "name": "modified-iterating-set",
+        "message_template": "Iterated set '%s' is being modified inside for loop body, iterate through a copy of it instead.",
+        "description": "Emitted when items are added or removed to a set being iterated through. Doing so raises a RuntimeError."
+    },
+    {
+        "error_code": "W2101",
+        "name": "useless-with-lock",
+        "message_template": "'%s()' directly created in 'with' has no effect",
+        "description": "Used when a new lock instance is created by using with statement which has no effect. Instead, an existing instance should be used to acquire lock."
+    },
+    {
+        "error_code": "E3701",
+        "name": "invalid-field-call",
+        "message_template": "Invalid usage of field(), %s",
+        "description": "The dataclasses.field() specifier should only be used as the value of an assignment within a dataclass, or within the make_dataclass() function."
+    },
+    {
+        "error_code": "W2301",
+        "name": "unnecessary-ellipsis",
+        "message_template": "Unnecessary ellipsis constant",
+        "description": "Used when the ellipsis constant is encountered and can be avoided. A line of code consisting of an ellipsis is unnecessary if there is a docstring on the preceding line or if there is a statement in the same scope."
+    },
+    {
+        "error_code": "W3301",
+        "name": "nested-min-max",
+        "message_template": "Do not use nested call of '%s'; it's possible to do '%s' instead",
+        "description": "Nested calls ``min(1, min(2, 3))`` can be rewritten as ``min(1, 2, 3)``."
+    },
+    {
+        "error_code": "W2601",
+        "name": "using-f-string-in-unsupported-version",
+        "message_template": "F-strings are not supported by all versions included in the py-version setting",
+        "description": "Used when the py-version set by the user is lower than 3.6 and pylint encounters an f-string."
+    },
+    {
+        "error_code": "W2602",
+        "name": "using-final-decorator-in-unsupported-version",
+        "message_template": "typing.final is not supported by all versions included in the py-version setting",
+        "description": "Used when the py-version set by the user is lower than 3.8 and pylint encounters a ``typing.final`` decorator."
+    },
+    {
+        "error_code": "W2603",
+        "name": "using-exception-groups-in-unsupported-version",
+        "message_template": "Exception groups are not supported by all versions included in the py-version setting",
+        "description": "Used when the py-version set by the user is lower than 3.11 and pylint encounters ``except*`` or `ExceptionGroup``."
+    },
+    {
+        "error_code": "W2604",
+        "name": "using-generic-type-syntax-in-unsupported-version",
+        "message_template": "Generic type syntax (PEP 695) is not supported by all versions included in the py-version setting",
+        "description": "Used when the py-version set by the user is lower than 3.12 and pylint encounters generic type syntax."
+    },
+    {
+        "error_code": "W2605",
+        "name": "using-assignment-expression-in-unsupported-version",
+        "message_template": "Assignment expression is not supported by all versions included in the py-version setting",
+        "description": "Used when the py-version set by the user is lower than 3.8 and pylint encounters an assignment expression (walrus) operator."
+    },
+    {
+        "error_code": "W2606",
+        "name": "using-positional-only-args-in-unsupported-version",
+        "message_template": "Positional-only arguments are not supported by all versions included in the py-version setting",
+        "description": "Used when the py-version set by the user is lower than 3.8 and pylint encounters positional-only arguments."
+    },
+    {
+        "error_code": "W0101",
+        "name": "unreachable",
+        "message_template": "Unreachable code",
+        "description": "Used when there is some code behind a \"return\" or \"raise\" statement, which will never be accessed."
+    },
+    {
+        "error_code": "W0102",
+        "name": "dangerous-default-value",
+        "message_template": "Dangerous default value %s as argument",
+        "description": "Used when a mutable value as list or dictionary is detected in a default value for an argument."
+    },
+    {
+        "error_code": "W0104",
+        "name": "pointless-statement",
+        "message_template": "Statement seems to have no effect",
+        "description": "Used when a statement doesn't have (or at least seems to) any effect."
+    },
+    {
+        "error_code": "W0105",
+        "name": "pointless-string-statement",
+        "message_template": "String statement has no effect",
+        "description": "Used when a string is used as a statement (which of course has no effect). This is a particular case of W0104 with its own message so you can easily disable it if you're using those strings as documentation, instead of comments."
+    },
+    {
+        "error_code": "W0106",
+        "name": "expression-not-assigned",
+        "message_template": "Expression \"%s\" is assigned to nothing",
+        "description": "Used when an expression that is not a function call is assigned to nothing. Probably something else was intended."
+    },
+    {
+        "error_code": "W0108",
+        "name": "unnecessary-lambda",
+        "message_template": "Lambda may not be necessary",
+        "description": "Used when the body of a lambda expression is a function call on the same argument list as the lambda itself; such lambda expressions are in all but a few cases replaceable with the function being called in the body of the lambda."
+    },
+    {
+        "error_code": "W0109",
+        "name": "duplicate-key",
+        "message_template": "Duplicate key %r in dictionary",
+        "description": "Used when a dictionary expression binds the same key multiple times."
+    },
+    {
+        "error_code": "W0122",
+        "name": "exec-used",
+        "message_template": "Use of exec",
+        "description": "Raised when the 'exec' statement is used. It's dangerous to use this function for a user input, and it's also slower than actual code in general. This doesn't mean you should never use it, but you should consider alternatives first and restrict the functions available."
+    },
+    {
+        "error_code": "W0123",
+        "name": "eval-used",
+        "message_template": "Use of eval",
+        "description": "Used when you use the \"eval\" function, to discourage its usage. Consider using `ast.literal_eval` for safely evaluating strings containing Python expressions from untrusted sources."
+    },
+    {
+        "error_code": "W0150",
+        "name": "lost-exception",
+        "message_template": "%s statement in finally block may swallow exception",
+        "description": "Used when a break or a return statement is found inside the finally clause of a try...finally block: the exceptions raised in the try clause will be silently swallowed instead of being re-raised."
+    },
+    {
+        "error_code": "W0199",
+        "name": "assert-on-tuple",
+        "message_template": "Assert called on a populated tuple. Did you mean 'assert x,y'?",
+        "description": "A call of assert on a tuple will always evaluate to true if the tuple is not empty, and will always evaluate to false if it is."
+    },
+    {
+        "error_code": "W0124",
+        "name": "confusing-with-statement",
+        "message_template": "Following \"as\" with another context manager looks like a tuple.",
+        "description": "Emitted when a `with` statement component returns multiple values and uses name binding with `as` only for a part of those values, as in with ctx() as a, b. This can be misleading, since it's not clear if the context manager returns a tuple or if the node without a name binding is another context manager."
+    },
+    {
+        "error_code": "W0125",
+        "name": "using-constant-test",
+        "message_template": "Using a conditional statement with a constant value",
+        "description": "Emitted when a conditional statement (If or ternary if) uses a constant value for its test. This might not be what the user intended to do."
+    },
+    {
+        "error_code": "W0126",
+        "name": "missing-parentheses-for-call-in-test",
+        "message_template": "Using a conditional statement with potentially wrong function or method call due to missing parentheses",
+        "description": "Emitted when a conditional statement (If or ternary if) seems to wrongly call a function due to missing parentheses"
+    },
+    {
+        "error_code": "W0127",
+        "name": "self-assigning-variable",
+        "message_template": "Assigning the same variable %r to itself",
+        "description": "Emitted when we detect that a variable is assigned to itself"
+    },
+    {
+        "error_code": "W0128",
+        "name": "redeclared-assigned-name",
+        "message_template": "Redeclared variable %r in assignment",
+        "description": "Emitted when we detect that a variable was redeclared in the same assignment."
+    },
+    {
+        "error_code": "E0111",
+        "name": "bad-reversed-sequence",
+        "message_template": "The first reversed() argument is not a sequence",
+        "description": "Used when the first argument to reversed() builtin isn't a sequence (does not implement __reversed__, nor __getitem__ and __len__"
+    },
+    {
+        "error_code": "E0119",
+        "name": "misplaced-format-function",
+        "message_template": "format function is not called on str",
+        "description": "Emitted when format function is not called on str object. e.g doing print(\"value: {}\").format(123) instead of print(\"value: {}\".format(123)). This might not be what the user intended to do."
+    },
+    {
+        "error_code": "W0129",
+        "name": "assert-on-string-literal",
+        "message_template": "Assert statement has a string literal as its first argument. The assert will %s fail.",
+        "description": "Used when an assert statement has a string literal as its first argument, which will cause the assert to always pass."
+    },
+    {
+        "error_code": "W0130",
+        "name": "duplicate-value",
+        "message_template": "Duplicate value %r in set",
+        "description": "This message is emitted when a set contains the same value two or more times."
+    },
+    {
+        "error_code": "W0131",
+        "name": "named-expr-without-context",
+        "message_template": "Named expression used without context",
+        "description": "Emitted if named expression is used to do a regular assignment outside a context like if, for, while, or a comprehension."
+    },
+    {
+        "error_code": "W0133",
+        "name": "pointless-exception-statement",
+        "message_template": "Exception statement has no effect",
+        "description": "Used when an exception is created without being assigned, raised or returned for subsequent use elsewhere."
+    },
+    {
+        "error_code": "W0134",
+        "name": "return-in-finally",
+        "message_template": "'return' shadowed by the 'finally' clause.",
+        "description": "Emitted when a 'return' statement is found in a 'finally' block. This will overwrite the return value of a function and should be avoided."
+    },
+    {
+        "error_code": "E0100",
+        "name": "init-is-generator",
+        "message_template": "__init__ method is a generator",
+        "description": "Used when the special class method __init__ is turned into a generator by a yield in its body."
+    },
+    {
+        "error_code": "E0101",
+        "name": "return-in-init",
+        "message_template": "Explicit return in __init__",
+        "description": "Used when the special class method __init__ has an explicit return value."
+    },
+    {
+        "error_code": "E0102",
+        "name": "function-redefined",
+        "message_template": "%s already defined line %s",
+        "description": "Used when a function / class / method is redefined."
+    },
+    {
+        "error_code": "E0103",
+        "name": "not-in-loop",
+        "message_template": "%r not properly in loop",
+        "description": "Used when break or continue keywords are used outside a loop."
+    },
+    {
+        "error_code": "E0104",
+        "name": "return-outside-function",
+        "message_template": "Return outside function",
+        "description": "Used when a \"return\" statement is found outside a function or method."
+    },
+    {
+        "error_code": "E0105",
+        "name": "yield-outside-function",
+        "message_template": "Yield outside function",
+        "description": "Used when a \"yield\" statement is found outside a function or method."
+    },
+    {
+        "error_code": "E0106",
+        "name": "return-arg-in-generator",
+        "message_template": "Return with argument inside generator",
+        "description": "Used when a \"return\" statement with an argument is found in a generator function or method (e.g. with some \"yield\" statements)."
+    },
+    {
+        "error_code": "E0107",
+        "name": "nonexistent-operator",
+        "message_template": "Use of the non-existent %s operator",
+        "description": "Used when you attempt to use the C-style pre-increment or pre-decrement operator -- and ++, which doesn't exist in Python."
+    },
+    {
+        "error_code": "E0108",
+        "name": "duplicate-argument-name",
+        "message_template": "Duplicate argument name %r in function definition",
+        "description": "Duplicate argument names in function definitions are syntax errors."
+    },
+    {
+        "error_code": "E0110",
+        "name": "abstract-class-instantiated",
+        "message_template": "Abstract class %r with abstract methods instantiated",
+        "description": "Used when an abstract class with `abc.ABCMeta` as metaclass has abstract methods and is instantiated."
+    },
+    {
+        "error_code": "W0120",
+        "name": "useless-else-on-loop",
+        "message_template": "Else clause on loop without a break statement, remove the else and de-indent all the code inside it",
+        "description": "Loops should only have an else clause if they can exit early with a break statement, otherwise the statements under else should be on the same scope as the loop itself."
+    },
+    {
+        "error_code": "E0112",
+        "name": "too-many-star-expressions",
+        "message_template": "More than one starred expression in assignment",
+        "description": "Emitted when there are more than one starred expressions (`*x`) in an assignment. This is a SyntaxError."
+    },
+    {
+        "error_code": "E0113",
+        "name": "invalid-star-assignment-target",
+        "message_template": "Starred assignment target must be in a list or tuple",
+        "description": "Emitted when a star expression is used as a starred assignment target."
+    },
+    {
+        "error_code": "E0114",
+        "name": "star-needs-assignment-target",
+        "message_template": "Can use starred expression only in assignment target",
+        "description": "Emitted when a star expression is not used in an assignment target."
+    },
+    {
+        "error_code": "E0115",
+        "name": "nonlocal-and-global",
+        "message_template": "Name %r is nonlocal and global",
+        "description": "Emitted when a name is both nonlocal and global."
+    },
+    {
+        "error_code": "E0117",
+        "name": "nonlocal-without-binding",
+        "message_template": "nonlocal name %s found without binding",
+        "description": "Emitted when a nonlocal variable does not have an attached name somewhere in the parent scopes"
+    },
+    {
+        "error_code": "E0118",
+        "name": "used-prior-global-declaration",
+        "message_template": "Name %r is used prior to global declaration",
+        "description": "Emitted when a name is used prior a global declaration, which results in an error since Python 3.6."
+    },
+    {
+        "error_code": "W0136",
+        "name": "continue-in-finally",
+        "message_template": "'continue' discouraged inside 'finally' clause",
+        "description": "Emitted when the `continue` keyword is found inside a finally clause. This will raise a SyntaxWarning starting in Python 3.14."
+    },
+    {
+        "error_code": "W0137",
+        "name": "break-in-finally",
+        "message_template": "'break' discouraged inside 'finally' clause",
+        "description": "Emitted when the `break` keyword is found inside a finally clause. This will raise a SyntaxWarning starting in Python 3.14."
+    },
+    {
+        "error_code": "W0107",
+        "name": "unnecessary-pass",
+        "message_template": "Unnecessary pass statement",
+        "description": "Used when a \"pass\" statement can be removed without affecting the behaviour of the code."
+    },
+    {
+        "error_code": "C0121",
+        "name": "singleton-comparison",
+        "message_template": "Comparison %s should be %s",
+        "description": "Used when an expression is compared to singleton values like True, False or None."
+    },
+    {
+        "error_code": "C0123",
+        "name": "unidiomatic-typecheck",
+        "message_template": "Use isinstance() rather than type() for a typecheck.",
+        "description": "The idiomatic way to perform an explicit typecheck in Python is to use isinstance(x, Y) rather than type(x) == Y, type(x) is Y. Though there are unusual situations where these give different results."
+    },
+    {
+        "error_code": "R0123",
+        "name": "literal-comparison",
+        "message_template": "In '%s', use '%s' when comparing constant literals not '%s' ('%s')",
+        "description": "Used when comparing an object to a literal, which is usually what you do not want to do, since you can compare to a different literal than what was expected altogether."
+    },
+    {
+        "error_code": "R0124",
+        "name": "comparison-with-itself",
+        "message_template": "Redundant comparison - %s",
+        "description": "Used when something is compared against itself."
+    },
+    {
+        "error_code": "R0133",
+        "name": "comparison-of-constants",
+        "message_template": "Comparison between constants: \"%s %s %s\" has a constant value",
+        "description": "When two literals are compared with each other the result is a constant. Using the constant directly is both easier to read and more performant. Initializing 'True' and 'False' this way is not required since Python 2.3."
+    },
+    {
+        "error_code": "W0143",
+        "name": "comparison-with-callable",
+        "message_template": "Comparing against a callable, did you omit the parenthesis?",
+        "description": "This message is emitted when pylint detects that a comparison with a callable was made, which might suggest that some parenthesis were omitted, resulting in potential unwanted behaviour."
+    },
+    {
+        "error_code": "W0177",
+        "name": "nan-comparison",
+        "message_template": "Comparison %s should be %s",
+        "description": "Used when an expression is compared to NaN values like numpy.NaN and float('nan')."
+    },
+    {
+        "error_code": "C0112",
+        "name": "empty-docstring",
+        "message_template": "Empty %s docstring",
+        "description": "Used when a module, function, class or method has an empty docstring (it would be too easy ;)."
+    },
+    {
+        "error_code": "C0114",
+        "name": "missing-module-docstring",
+        "message_template": "Missing module docstring",
+        "description": "Used when a module has no docstring. Empty modules do not require a docstring."
+    },
+    {
+        "error_code": "C0115",
+        "name": "missing-class-docstring",
+        "message_template": "Missing class docstring",
+        "description": "Used when a class has no docstring. Even an empty class must have a docstring."
+    },
+    {
+        "error_code": "C0116",
+        "name": "missing-function-docstring",
+        "message_template": "Missing function or method docstring",
+        "description": "Used when a function or method has no docstring. Some special methods like __init__ do not require a docstring."
+    },
+    {
+        "error_code": "W0135",
+        "name": "contextmanager-generator-missing-cleanup",
+        "message_template": "The context used in function %r will not be exited.",
+        "description": "Used when a contextmanager is used inside a generator function and the cleanup is not handled."
+    },
+    {
+        "error_code": "C0103",
+        "name": "invalid-name",
+        "message_template": "%s name \"%s\" doesn't conform to %s",
+        "description": "Used when the name doesn't conform to naming rules associated to its type (constant, variable, class...)."
+    },
+    {
+        "error_code": "C0104",
+        "name": "disallowed-name",
+        "message_template": "Disallowed name \"%s\"",
+        "description": "Used when the name matches bad-names or bad-names-rgxs- (unauthorized names)."
+    },
+    {
+        "error_code": "C0105",
+        "name": "typevar-name-incorrect-variance",
+        "message_template": "Type variable name does not reflect variance%s",
+        "description": "Emitted when a TypeVar name doesn't reflect its type variance. According to PEP8, it is recommended to add suffixes '_co' and '_contra' to the variables used to declare covariant or contravariant behaviour respectively. Invariant (default) variables do not require a suffix. The message is also emitted when invariant variables do have a suffix."
+    },
+    {
+        "error_code": "C0131",
+        "name": "typevar-double-variance",
+        "message_template": "TypeVar cannot be both covariant and contravariant",
+        "description": "Emitted when both the \"covariant\" and \"contravariant\" keyword arguments are set to \"True\" in a TypeVar."
+    },
+    {
+        "error_code": "C0132",
+        "name": "typevar-name-mismatch",
+        "message_template": "TypeVar name \"%s\" does not match assigned variable name \"%s\"",
+        "description": "Emitted when a TypeVar is assigned to a variable that does not match its name argument."
+    },
+    {
+        "error_code": "E0302",
+        "name": "unexpected-special-method-signature",
+        "message_template": "The special method %r expects %s param(s), %d %s given",
+        "description": "Emitted when a special method was defined with an invalid number of parameters. If it has too few or too many, it might not work at all."
+    },
+    {
+        "error_code": "E0303",
+        "name": "invalid-length-returned",
+        "message_template": "__len__ does not return non-negative integer",
+        "description": "Used when a __len__ method returns something which is not a non-negative integer"
+    },
+    {
+        "error_code": "E0304",
+        "name": "invalid-bool-returned",
+        "message_template": "__bool__ does not return bool",
+        "description": "Used when a __bool__ method returns something which is not a bool"
+    },
+    {
+        "error_code": "E0305",
+        "name": "invalid-index-returned",
+        "message_template": "__index__ does not return int",
+        "description": "Used when an __index__ method returns something which is not an integer"
+    },
+    {
+        "error_code": "E0306",
+        "name": "invalid-repr-returned",
+        "message_template": "__repr__ does not return str",
+        "description": "Used when a __repr__ method returns something which is not a string"
+    },
+    {
+        "error_code": "E0307",
+        "name": "invalid-str-returned",
+        "message_template": "__str__ does not return str",
+        "description": "Used when a __str__ method returns something which is not a string"
+    },
+    {
+        "error_code": "E0308",
+        "name": "invalid-bytes-returned",
+        "message_template": "__bytes__ does not return bytes",
+        "description": "Used when a __bytes__ method returns something which is not bytes"
+    },
+    {
+        "error_code": "E0309",
+        "name": "invalid-hash-returned",
+        "message_template": "__hash__ does not return int",
+        "description": "Used when a __hash__ method returns something which is not an integer"
+    },
+    {
+        "error_code": "E0310",
+        "name": "invalid-length-hint-returned",
+        "message_template": "__length_hint__ does not return non-negative integer",
+        "description": "Used when a __length_hint__ method returns something which is not a non-negative integer"
+    },
+    {
+        "error_code": "E0311",
+        "name": "invalid-format-returned",
+        "message_template": "__format__ does not return str",
+        "description": "Used when a __format__ method returns something which is not a string"
+    },
+    {
+        "error_code": "E0312",
+        "name": "invalid-getnewargs-returned",
+        "message_template": "__getnewargs__ does not return a tuple",
+        "description": "Used when a __getnewargs__ method returns something which is not a tuple"
+    },
+    {
+        "error_code": "E0313",
+        "name": "invalid-getnewargs-ex-returned",
+        "message_template": "__getnewargs_ex__ does not return a tuple containing (tuple, dict)",
+        "description": "Used when a __getnewargs_ex__ method returns something which is not of the form tuple(tuple, dict)"
+    },
+    {
+        "error_code": "C0200",
+        "name": "consider-using-enumerate",
+        "message_template": "Consider using enumerate instead of iterating with range and len",
+        "description": "Emitted when code that iterates with range and len is encountered. Such code can be simplified by using the enumerate builtin."
+    },
+    {
+        "error_code": "C0201",
+        "name": "consider-iterating-dictionary",
+        "message_template": "Consider iterating the dictionary directly instead of calling .keys()",
+        "description": "Emitted when the keys of a dictionary are iterated through the ``.keys()`` method or when ``.keys()`` is used for a membership check. It is enough to iterate through the dictionary itself, ``for key in dictionary``. For membership checks, ``if key in dictionary`` is faster."
+    },
+    {
+        "error_code": "C0206",
+        "name": "consider-using-dict-items",
+        "message_template": "Consider iterating with .items()",
+        "description": "Emitted when iterating over the keys of a dictionary and accessing the value by index lookup. Both the key and value can be accessed by iterating using the .items() method of the dictionary instead."
+    },
+    {
+        "error_code": "C0207",
+        "name": "use-maxsplit-arg",
+        "message_template": "Use %s instead",
+        "description": "Emitted when accessing only the first or last element of str.split(). The first and last element can be accessed by using str.split(sep, maxsplit=1)[0] or str.rsplit(sep, maxsplit=1)[-1] instead."
+    },
+    {
+        "error_code": "C0208",
+        "name": "use-sequence-for-iteration",
+        "message_template": "Use a sequence type when iterating over values",
+        "description": "When iterating over values, sequence types (e.g., ``lists``, ``tuples``, ``ranges``) are more efficient than ``sets``."
+    },
+    {
+        "error_code": "C0209",
+        "name": "consider-using-f-string",
+        "message_template": "Formatting a regular string which could be an f-string",
+        "description": "Used when we detect a string that is being formatted with format() or % which could potentially be an f-string. The use of f-strings is preferred. Requires Python 3.6 and ``py-version >= 3.6``."
+    },
+    {
+        "error_code": "R1701",
+        "name": "consider-merging-isinstance",
+        "message_template": "Consider merging these isinstance calls to isinstance(%s, (%s))",
+        "description": "Used when multiple consecutive isinstance calls can be merged into one."
+    },
+    {
+        "error_code": "R1706",
+        "name": "consider-using-ternary",
+        "message_template": "Consider using ternary (%s)",
+        "description": "Used when one of known pre-python 2.5 ternary syntax is used."
+    },
+    {
+        "error_code": "R1709",
+        "name": "simplify-boolean-expression",
+        "message_template": "Boolean expression may be simplified to %s",
+        "description": "Emitted when redundant pre-python 2.5 ternary syntax is used."
+    },
+    {
+        "error_code": "R1726",
+        "name": "simplifiable-condition",
+        "message_template": "Boolean condition \"%s\" may be simplified to \"%s\"",
+        "description": "Emitted when a boolean condition is able to be simplified."
+    },
+    {
+        "error_code": "R1727",
+        "name": "condition-evals-to-constant",
+        "message_template": "Boolean condition '%s' will always evaluate to '%s'",
+        "description": "Emitted when a boolean condition can be simplified to a constant value."
+    },
+    {
+        "error_code": "R1702",
+        "name": "too-many-nested-blocks",
+        "message_template": "Too many nested blocks (%s/%s)",
+        "description": "Used when a function or a method has too many nested blocks. This makes the code less understandable and maintainable."
+    },
+    {
+        "error_code": "R1703",
+        "name": "simplifiable-if-statement",
+        "message_template": "The if statement can be replaced with %s",
+        "description": "Used when an if statement can be replaced with 'bool(test)'."
+    },
+    {
+        "error_code": "R1704",
+        "name": "redefined-argument-from-local",
+        "message_template": "Redefining argument with the local name %r",
+        "description": "Used when a local name is redefining an argument, which might suggest a potential error. This is taken in account only for a handful of name binding operations, such as for iteration, with statement assignment and exception handler assignment."
+    },
+    {
+        "error_code": "R1705",
+        "name": "no-else-return",
+        "message_template": "Unnecessary \"%s\" after \"return\", %s",
+        "description": "Used in order to highlight an unnecessary block of code following an if, or a try/except containing a return statement. As such, it will warn when it encounters an else following a chain of ifs, all of them containing a return statement."
+    },
+    {
+        "error_code": "R1707",
+        "name": "trailing-comma-tuple",
+        "message_template": "Disallow trailing comma tuple",
+        "description": "In Python, a tuple is actually created by the comma symbol, not by the parentheses. Unfortunately, one can actually create a tuple by misplacing a trailing comma, which can lead to potential weird bugs in your code. You should always use parentheses explicitly for creating a tuple."
+    },
+    {
+        "error_code": "R1708",
+        "name": "stop-iteration-return",
+        "message_template": "Do not raise StopIteration in generator, use return statement instead",
+        "description": "According to PEP479, the raise of StopIteration to end the loop of a generator may lead to hard to find bugs. This PEP specify that raise StopIteration has to be replaced by a simple return statement"
+    },
+    {
+        "error_code": "R1710",
+        "name": "inconsistent-return-statements",
+        "message_template": "Either all return statements in a function should return an expression, or none of them should.",
+        "description": "According to PEP8, if any return statement returns an expression, any return statements where no value is returned should explicitly state this as return None, and an explicit return statement should be present at the end of the function (if reachable)"
+    },
+    {
+        "error_code": "R1711",
+        "name": "useless-return",
+        "message_template": "Useless return at end of function or method",
+        "description": "Emitted when a single \"return\" or \"return None\" statement is found at the end of function or method definition. This statement can safely be removed because Python will implicitly return None"
+    },
+    {
+        "error_code": "R1712",
+        "name": "consider-swap-variables",
+        "message_template": "Consider using tuple unpacking for swapping variables",
+        "description": "You do not have to use a temporary variable in order to swap variables. Using \"tuple unpacking\" to directly swap variables makes the intention more clear."
+    },
+    {
+        "error_code": "R1713",
+        "name": "consider-using-join",
+        "message_template": "Consider using str.join(sequence) for concatenating strings from an iterable",
+        "description": "Using str.join(sequence) is faster, uses less memory and increases readability compared to for-loop iteration."
+    },
+    {
+        "error_code": "R1714",
+        "name": "consider-using-in",
+        "message_template": "Consider merging these comparisons with 'in' by using '%s %sin (%s)'. Use a set instead if elements are hashable.",
+        "description": "To check if a variable is equal to one of many values, combine the values into a set or tuple and check if the variable is contained \"in\" it instead of checking for equality against each of the values. This is faster and less verbose."
+    },
+    {
+        "error_code": "R1715",
+        "name": "consider-using-get",
+        "message_template": "Consider using dict.get for getting values from a dict if a key is present or a default if not",
+        "description": "Using the builtin dict.get for getting a value from a dictionary if a key is present or a default if not, is simpler and considered more idiomatic, although sometimes a bit slower"
+    },
+    {
+        "error_code": "R1716",
+        "name": "chained-comparison",
+        "message_template": "Simplify chained comparison between the operands",
+        "description": "This message is emitted when pylint encounters boolean operation like \"a < b and b < c\", suggesting instead to refactor it to \"a < b < c\""
+    },
+    {
+        "error_code": "R1717",
+        "name": "consider-using-dict-comprehension",
+        "message_template": "Consider using a dictionary comprehension",
+        "description": "Emitted when we detect the creation of a dictionary using the dict() callable and a transient list. Although there is nothing syntactically wrong with this code, it is hard to read and can be simplified to a dict comprehension. Also it is faster since you don't need to create another transient list"
+    },
+    {
+        "error_code": "R1718",
+        "name": "consider-using-set-comprehension",
+        "message_template": "Consider using a set comprehension",
+        "description": "Although there is nothing syntactically wrong with this code, it is hard to read and can be simplified to a set comprehension. Also it is faster since you don't need to create another transient list"
+    },
+    {
+        "error_code": "R1719",
+        "name": "simplifiable-if-expression",
+        "message_template": "The if expression can be replaced with %s",
+        "description": "Used when an if expression can be replaced with 'bool(test)' or simply 'test' if the boolean cast is implicit."
+    },
+    {
+        "error_code": "R1720",
+        "name": "no-else-raise",
+        "message_template": "Unnecessary \"%s\" after \"raise\", %s",
+        "description": "Used in order to highlight an unnecessary block of code following an if, or a try/except containing a raise statement. As such, it will warn when it encounters an else following a chain of ifs, all of them containing a raise statement."
+    },
+    {
+        "error_code": "R1721",
+        "name": "unnecessary-comprehension",
+        "message_template": "Unnecessary use of a comprehension, use %s instead.",
+        "description": "Instead of using an identity comprehension, consider using the list, dict or set constructor. It is faster and simpler."
+    },
+    {
+        "error_code": "R1722",
+        "name": "consider-using-sys-exit",
+        "message_template": "Consider using 'sys.exit' instead",
+        "description": "Contrary to 'exit()' or 'quit()', 'sys.exit' does not rely on the site module being available (as the 'sys' module is always available)."
+    },
+    {
+        "error_code": "R1723",
+        "name": "no-else-break",
+        "message_template": "Unnecessary \"%s\" after \"break\", %s",
+        "description": "Used in order to highlight an unnecessary block of code following an if containing a break statement. As such, it will warn when it encounters an else following a chain of ifs, all of them containing a break statement."
+    },
+    {
+        "error_code": "R1724",
+        "name": "no-else-continue",
+        "message_template": "Unnecessary \"%s\" after \"continue\", %s",
+        "description": "Used in order to highlight an unnecessary block of code following an if containing a continue statement. As such, it will warn when it encounters an else following a chain of ifs, all of them containing a continue statement."
+    },
+    {
+        "error_code": "R1725",
+        "name": "super-with-arguments",
+        "message_template": "Consider using Python 3 style super() without arguments",
+        "description": "Emitted when calling the super() builtin with the current class and instance. On Python 3 these arguments are the default and they can be omitted."
+    },
+    {
+        "error_code": "R1728",
+        "name": "consider-using-generator",
+        "message_template": "Consider using a generator instead '%s(%s)'",
+        "description": "If your container can be large using a generator will bring better performance."
+    },
+    {
+        "error_code": "R1729",
+        "name": "use-a-generator",
+        "message_template": "Use a generator instead '%s(%s)'",
+        "description": "Comprehension inside of 'any', 'all', 'max', 'min' or 'sum' is unnecessary. A generator would be sufficient and faster."
+    },
+    {
+        "error_code": "R1730",
+        "name": "consider-using-min-builtin",
+        "message_template": "Consider using '%s' instead of unnecessary if block",
+        "description": "Using the min builtin instead of a conditional improves readability and conciseness."
+    },
+    {
+        "error_code": "R1731",
+        "name": "consider-using-max-builtin",
+        "message_template": "Consider using '%s' instead of unnecessary if block",
+        "description": "Using the max builtin instead of a conditional improves readability and conciseness."
+    },
+    {
+        "error_code": "R1732",
+        "name": "consider-using-with",
+        "message_template": "Consider using 'with' for resource-allocating operations",
+        "description": "Emitted if a resource-allocating assignment or call may be replaced by a 'with' block. By using 'with' the release of the allocated resources is ensured even in the case of an exception."
+    },
+    {
+        "error_code": "R1733",
+        "name": "unnecessary-dict-index-lookup",
+        "message_template": "Unnecessary dictionary index lookup, use '%s' instead",
+        "description": "Emitted when iterating over the dictionary items (key-item pairs) and accessing the value by index lookup. The value can be accessed directly instead."
+    },
+    {
+        "error_code": "R1734",
+        "name": "use-list-literal",
+        "message_template": "Consider using [] instead of list()",
+        "description": "Emitted when using list() to create an empty list instead of the literal []. The literal is faster as it avoids an additional function call."
+    },
+    {
+        "error_code": "R1735",
+        "name": "use-dict-literal",
+        "message_template": "Consider using '%s' instead of a call to 'dict'.",
+        "description": "Emitted when using dict() to create a dictionary instead of a literal '{ ... }'. The literal is faster as it avoids an additional function call."
+    },
+    {
+        "error_code": "R1736",
+        "name": "unnecessary-list-index-lookup",
+        "message_template": "Unnecessary list index lookup, use '%s' instead",
+        "description": "Emitted when iterating over an enumeration and accessing the value by index lookup. The value can be accessed directly instead."
+    },
+    {
+        "error_code": "R1737",
+        "name": "use-yield-from",
+        "message_template": "Use 'yield from' directly instead of yielding each element one by one",
+        "description": "Yielding directly from the iterator is faster and arguably cleaner code than yielding each element one by one in the loop."
+    },
+    {
+        "error_code": "C0117",
+        "name": "unnecessary-negation",
+        "message_template": "Consider changing \"%s\" to \"%s\"",
+        "description": "Used when a boolean expression contains an unneeded negation, e.g. when two negation operators cancel each other out."
+    },
+    {
+        "error_code": "C1802",
+        "name": "use-implicit-booleaness-not-len",
+        "message_template": "Do not use `len(SEQUENCE)` without comparison to determine if a sequence is empty",
+        "description": "Empty sequences are considered false in a boolean context. You can either remove the call to 'len' (``if not x``) or compare the length against a scalar (``if len(x) > 1``)."
+    },
+    {
+        "error_code": "C1803",
+        "name": "use-implicit-booleaness-not-comparison",
+        "message_template": "\"%s\" can be simplified to \"%s\", if it is strictly a sequence, as an empty %s is falsey",
+        "description": "Empty sequences are considered false in a boolean context. Following this check blindly in weakly typed code base can create hard to debug issues. If the value can be something else that is falsey but not a sequence (for example ``None``, an empty string, or ``0``) the code will not be equivalent."
+    },
+    {
+        "error_code": "C1804",
+        "name": "use-implicit-booleaness-not-comparison-to-string",
+        "message_template": "\"%s\" can be simplified to \"%s\", if it is strictly a string, as an empty string is falsey",
+        "description": "Empty string are considered false in a boolean context. Following this check blindly in weakly typed code base can create hard to debug issues. If the value can be something else that is falsey but not a string (for example ``None``, an empty sequence, or ``0``) the code will not be equivalent."
+    },
+    {
+        "error_code": "C1805",
+        "name": "use-implicit-booleaness-not-comparison-to-zero",
+        "message_template": "\"%s\" can be simplified to \"%s\", if it is strictly an int, as 0 is falsey",
+        "description": "0 is considered false in a boolean context. Following this check blindly in weakly typed code base can create hard to debug issues. If the value can be something else that is falsey but not an int (for example ``None``, an empty string, or an empty sequence) the code will not be equivalent."
+    }
+]
