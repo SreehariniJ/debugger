@@ -7,7 +7,12 @@ A privacy-first, fully offline AI debugging suite. This tool **executes** Python
 * **Multi-Agent Pipeline**: Specialized agents (Analyzer, Explainer, Verifier, Fixer) work together.
 * **Offline RAG**: Queries a local JSON Knowledge Base for context-aware fixes.
 * **Autonomous Repair**: Generates a corrected `.py` file automatically.
+## 📦 Prerequisites: The AI Model
+Because AI model files are very large, they are not stored directly in this repository. You must download the "brain" of the debugger before use:
 
+1. **Automatic Download**: Simply run the provided script:
+   ```bash
+   python3 download_model.py
 ## 🛠️ Project Structure
 * `src/`: Core engine including agents and RAG logic.
 * `knowledge_base/`: Local JSON error-solution database.

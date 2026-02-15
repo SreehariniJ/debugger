@@ -1,18 +1,21 @@
-from huggingface_hub import hf_hub_download
+import os
+import urllib.request
 
-# Define the model details
-repo_id = "MaziyarPanahi/Llama-3-8B-Instruct-v0.1-GGUF"
-filename = "Llama-3-8B-Instruct-v0.1.Q4_K_M.gguf"
-local_dir = "models"
+def setup():
+    # Create models folder if it doesn't exist
+    if not os.path.exists("models"):
+        os.makedirs("models")
+        print("📁 Created 'models' directory.")
 
-print(f"Starting download of {filename} to {local_dir} folder...")
+    model_url = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+    save_path = "models/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
 
-# This function downloads the file directly to your local folder
-path = hf_hub_download(
-    repo_id=repo_id,
-    filename=filename,
-    local_dir=local_dir,
-    local_dir_use_symlinks=False
-)
+    if os.path.exists(save_path):
+        print("✅ Model already exists in /models.")
+    else:
+        print("⏳ Downloading Qwen 2.5 Coder (1.5B)... This may take a few minutes.")
+        urllib.request.urlretrieve(model_url, save_path)
+        print(f"🎉 Download complete! Saved to {save_path}")
 
-print(f"Successfully downloaded to: {path}")
+if __name__ == "__main__":
+    setup()
