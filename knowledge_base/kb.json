@@ -80,6 +80,38 @@
         "python": "x = 5",
         "js": "let x = 5;"
       }
+    },
+    "MutableDefaultArgument": {
+      "category": "Logic",
+      "explanation": "A mutable object (like a list or dict) is used as a default argument. This object is shared across all calls.",
+      "suggestion": "Use None as the default value and initialize the mutable object inside the function.",
+      "examples": {
+        "python": "def add_item(item, collection=[]):\n    collection.append(item)\n    return collection"
+      }
+    },
+    "LateBindingClosure": {
+      "category": "Logic",
+      "explanation": "Python's closures are late binding. This means that the values of variables used in closures are looked up at the time the inner function is called.",
+      "suggestion": "Pass the variable as a default argument to the lambda or inner function to bind it immediately.",
+      "examples": {
+        "python": "funcs = [lambda: i for i in range(3)]"
+      }
+    },
+    "MutableDefaultArgument": {
+      "category": "Logic",
+      "explanation": "A mutable object (like a list or dict) is used as a default argument. This object is shared across all calls.",
+      "suggestion": "Use None as the default value and initialize the mutable object inside the function.",
+      "examples": {
+        "python": "def add_item(item, collection=[]):\n    collection.append(item)\n    return collection"
+      }
+    },
+    "LateBindingClosure": {
+      "category": "Logic",
+      "explanation": "Python's closures are late binding. This means that the values of variables used in closures are looked up at the time the inner function is called.",
+      "suggestion": "Pass the variable as a default argument to the lambda or inner function to bind it immediately.",
+      "examples": {
+        "python": "funcs = [lambda: i for i in range(3)]"
+      }
     }
   },
   "secondary": {
@@ -130,30 +162,36 @@
     }
   },
   "patterns": {
-    "TypeError": ["<num> + '<string>'", "<array>.push('<string>')"],
-    "AttributeError": ["<object>.non_existing_method()"],
-    "IndexError": ["<list>[<out_of_range_index>]"],
-    "KeyError": ["<dict>['<missing_key>']"]
+    "TypeError": [
+      "<num> + '<string>'",
+      "<array>.push('<string>')"
+    ],
+    "AttributeError": [
+      "<object>.non_existing_method()"
+    ],
+    "IndexError": [
+      "<list>[<out_of_range_index>]"
+    ],
+    "KeyError": [
+      "<dict>['<missing_key>']"
+    ]
   },
   "ReferenceError": {
     "category": "Runtime",
     "explanation": "A variable is being used before it is defined.",
     "suggestion": "Declare the variable before using it.",
     "examples": {
-        "js": "console.log(b);"
+      "js": "console.log(b);"
     }
-
-    },
-    "TypeError": {
-      "category": "Runtime",
-      "explanation": "An operation is applied to an inappropriate type.",
-      "suggestion": "Check the variable types before operation."
-    },
-    "SyntaxError": {
-      "category": "Syntax",
-      "explanation": "JS code contains invalid syntax.",
-      "suggestion": "Check syntax, missing brackets, semicolons, etc."
-    }
+  },
+  "TypeError": {
+    "category": "Runtime",
+    "explanation": "An operation is applied to an inappropriate type.",
+    "suggestion": "Check the variable types before operation."
+  },
+  "SyntaxError": {
+    "category": "Syntax",
+    "explanation": "JS code contains invalid syntax.",
+    "suggestion": "Check syntax, missing brackets, semicolons, etc."
   }
-
-
+}

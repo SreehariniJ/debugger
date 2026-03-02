@@ -1,3 +1,8 @@
 llama-cpp-python
 huggingface_hub
 pyyaml
+fastapi>=0.100.0
+uvicorn
+python-multipart
+sh
+pydantic>=2.0.0
