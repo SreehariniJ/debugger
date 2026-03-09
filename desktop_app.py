@@ -1,78 +1,131 @@
-import webview
+from __future__ import annotations
+
+import json
+import logging
+import os
+import sys
 import threading
 import time
-import os
-import requests
-import uvicorn
-from app import app
-import sys
+import urllib.request
+from pathlib import Path
 
-# Ensure UTF-8 for console output
-if sys.stdout.encoding.lower() != 'utf-8':
+import uvicorn
+
+from app import app
+
+try:
+    import webview
+except ImportError:  # pragma: no cover - runtime dependency
+    webview = None
+
+
+BACKEND_HOST = "127.0.0.1"
+BACKEND_PORT = int(os.getenv("OFFLINE_DEBUGGER_PORT", "8000"))
+BACKEND_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
+HEALTH_URL = f"{BACKEND_URL}/health"
+PROJECT_ROOT = Path(__file__).resolve().parent
+FRONTEND_INDEX = PROJECT_ROOT / "frontend" / "dist" / "index.html"
+LOG_DIR = PROJECT_ROOT / "logs"
+LOG_FILE = LOG_DIR / "desktop.log"
+
+
+def _configure_logging() -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        handlers=[logging.FileHandler(LOG_FILE, encoding="utf-8"), logging.StreamHandler(sys.stdout)],
+    )
+
+
+logger = logging.getLogger("desktop_app")
+
+
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
     except AttributeError:
         pass
 
-def run_backend():
-    print("Starting Integrated Backend (API + UI)...")
-    try:
-        # Bind to 127.0.0.1 for local privacy and speed
-        uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
-    except Exception as e:
-        print(f"❌ Backend Crash: {e}")
 
-def wait_for_backend(url, timeout=30):
-    print(f"Waiting for backend to warm up at {url}...")
+def run_backend() -> None:
+    logger.info("starting backend host=%s port=%s", BACKEND_HOST, BACKEND_PORT)
+    uvicorn.run(app, host=BACKEND_HOST, port=BACKEND_PORT, log_level="error")
+
+
+def wait_for_backend(timeout_seconds: int = 30) -> tuple[bool, dict]:
+    logger.info("waiting for backend url=%s timeout=%ss", HEALTH_URL, timeout_seconds)
     start_time = time.time()
-    while time.time() - start_time < timeout:
+    while time.time() - start_time < timeout_seconds:
         try:
-            response = requests.get(f"{url}/health", timeout=2)
-            if response.status_code == 200:
-                print("✅ Backend is online and ready!")
-                return True
-        except requests.exceptions.RequestException:
-            pass
-        time.sleep(1)
-    return False
+            with urllib.request.urlopen(HEALTH_URL, timeout=2) as response:
+                if response.status != 200:
+                    time.sleep(0.5)
+                    continue
 
-def main():
-    backend_url = "http://127.0.0.1:8000"
-    
-    # 1. Start the backend in a daemon thread
-    t = threading.Thread(target=run_backend, daemon=True)
-    t.name = "FastAPI-Backend"
-    t.start()
-    
-    # 2. Synchronize
-    if not wait_for_backend(backend_url):
-        print("❌ Error: Integrated engine failed to initialize in time (30s timeout).")
-        print("Tip: Check if another process is using port 8000.")
+                payload = json.loads(response.read().decode("utf-8", errors="replace"))
+                if payload.get("status") == "online":
+                    return True, payload
+        except Exception:
+            time.sleep(0.5)
+    return False, {}
+
+
+def _preflight_checks() -> None:
+    if webview is None:
+        raise RuntimeError("pywebview is not installed. Run: pip install pywebview")
+    if not FRONTEND_INDEX.exists():
+        raise RuntimeError(
+            "Frontend build artifacts are missing. Run: cd frontend && npm install && npm run build"
+        )
+
+
+def main() -> None:
+    _configure_logging()
+    logger.info("desktop app boot start")
+    _preflight_checks()
+
+    backend_thread = threading.Thread(target=run_backend, daemon=True, name="FastAPI-Backend")
+    backend_thread.start()
+
+    ok, health = wait_for_backend()
+    if not ok:
+        logger.error("backend did not become healthy in time")
+        print("Backend failed to initialize within timeout. Check if port 8000 is in use.")
         sys.exit(1)
-        
-    # 3. Launch UI
-    print("🚀 Launching Debugger Elite window...")
+
+    logger.info(
+        "backend ready model_loaded=%s frontend_ready=%s",
+        health.get("model_loaded"),
+        health.get("frontend_ready"),
+    )
+
+    logger.info("launching desktop window")
     try:
-        # Create WebView window
-        # We'll try to use the most stable engine for Windows (WebView2)
         window = webview.create_window(
-            'Debugger Elite', 
-            backend_url,
+            "Offline AI-Powered Code Debugger using RAG and Multi-Agent Architecture",
+            BACKEND_URL,
             width=1300,
             height=900,
             min_size=(900, 700),
-            background_color='#09090b',
+            background_color="#09090b",
         )
-        # webview.start is a blocking call.
+
+        # Integration: Backend calls this to open a native folder dialog
+        # Removed thread-unsafe handle_browse_request to fallback to app.py PowerShell picker
+        app.on_open_folder_picker = None
+
         webview.start(debug=False)
-    except Exception as e:
-        print(f"❌ Window Launch Error: {e}")
-        print("\nFallback: You can still access the app at http://localhost:8000 in your browser.")
+    except Exception as exc:
+        logger.exception("desktop window failed: %s", exc)
+        print(f"Desktop UI failed: {exc}")
+        print(f"Fallback: open {BACKEND_URL} in your browser.")
     finally:
-        print("\n👋 Application closed.")
+        logger.info("desktop app closed")
+
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n👋 Shutdown requested.")
+        logger.info("shutdown requested by keyboard interrupt")

@@ -1,0 +1,26 @@
+{
+  "admin": {
+    "username": "admin",
+    "display_name": "Administrator",
+    "hashed_password": "$2b$12$XCCQNGWGtQ/DGFtonIJm7ezF4eZ36btq7Fgxi02F4I91VR0Y4966S",
+    "created_at": 1772729761.1831074
+  },
+  "admina": {
+    "username": "admina",
+    "display_name": "Tester",
+    "hashed_password": "$2b$12$L4eWx/nIbXDdUvlxm40SmuZE7F50VDkCl2WTPYRaAUBCuilgpcYvq",
+    "created_at": 1772730934.2526612
+  },
+  "sree": {
+    "username": "sree",
+    "display_name": "Sree",
+    "hashed_password": "$2b$12$Hp4gpnV0dJZOeA65fyS7TuXLwZL.KIzh2jX3pVdhveP90wL1CbrOq",
+    "created_at": 1772731494.4907265
+  },
+  "sre": {
+    "username": "sre",
+    "display_name": "Sree",
+    "hashed_password": "$2b$12$bqZhFmKs1R1f6Wk/nfIYze6AOvE7aregcKznUg2vwcrFwDfAAeHAC",
+    "created_at": 1772731533.233253
+  }
+}

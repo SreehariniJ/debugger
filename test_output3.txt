@@ -1,0 +1,11 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\Sreeharini\offline_debugger
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.10.0
+collected 14 items
+
+tests\test_api_endpoints.py ..............                               [100%]
+
+============================= 14 passed in 2.04s ==============================

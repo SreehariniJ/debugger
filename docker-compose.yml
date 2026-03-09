@@ -1,0 +1,15 @@
+services:
+  offline-debugger:
+    build:
+      context: .
+      args:
+        INSTALL_LLM: "0"
+    ports:
+      - "8000:8000"
+    environment:
+      OFFLINE_DEBUGGER_DISABLE_MODEL: "1"
+      OFFLINE_DEBUGGER_ALLOWED_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000"
+      OFFLINE_DEBUGGER_MAX_PIPELINES: "4"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./knowledge_base:/app/knowledge_base:ro

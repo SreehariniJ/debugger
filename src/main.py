@@ -5,7 +5,7 @@ import subprocess
 # Adding the 'src' directory to the system path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from scanner import CodeScanner
+from Scanner import CodeScanner
 from rag_engine import LocalRAGEngine
 from agents import DebuggingAgents
 

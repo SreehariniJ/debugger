@@ -1,0 +1,30 @@
+............F.                                                           [100%]
+================================== FAILURES ===================================
+______________________ test_apply_fix_creates_fixed_file ______________________
+
+    def test_apply_fix_creates_fixed_file() -> None:
+        workspace = Path(app.WORKSPACE_ROOT)
+        target = workspace / "_pytest_sample.py"
+        fixed_target = workspace / "fixed__pytest_sample.py"
+    
+        target.write_text("value = 1\nprint(value)\n", encoding="utf-8")
+        try:
+            response = client.post(
+                "/apply_fix",
+                json={
+                    "file_path": str(target),
+                    "fixed_code": "```python\nvalue = 2\nprint(value)\n```",
+                },
+            )
+            assert response.status_code == 200
+            payload = response.json()
+            assert Path(payload["path"]).exists()
+>           assert fixed_target.exists()
+E           AssertionError: assert False
+E            +  where False = exists()
+E            +    where exists = WindowsPath('C:/Users/Sreeharini/offline_debugger/fixed__pytest_sample.py').exists
+
+tests\test_api_endpoints.py:196: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_api_endpoints.py::test_apply_fix_creates_fixed_file - Asser...
+1 failed, 13 passed in 1.21s
