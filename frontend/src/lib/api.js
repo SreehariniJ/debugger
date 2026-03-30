@@ -10,9 +10,14 @@ function _getAuthHeaders() {
 
 function _handle401(response) {
   if (response.status === 401) {
+    const wasLoggedIn = !!localStorage.getItem(AUTH_TOKEN_KEY)
     localStorage.removeItem(AUTH_TOKEN_KEY)
     localStorage.removeItem('auth_user')
-    window.dispatchEvent(new Event('auth_expired'))
+    if (wasLoggedIn) {
+      window.dispatchEvent(new CustomEvent('auth_expired', { detail: 'Session expired. Please login again.' }))
+    } else {
+      window.dispatchEvent(new Event('auth_expired'))
+    }
   }
 }
 
@@ -30,17 +35,21 @@ function _formatErrorMessage(detail) {
   return 'Unknown error'
 }
 
-export async function fetchJson(url, options = {}) {
+export async function fetchWithAuth(url, options = {}) {
   const headers = { ..._getAuthHeaders(), ...(options.headers || {}) }
   const response = await fetch(url, { ...options, headers })
+  _handle401(response)
+  return response
+}
+
+export async function fetchJson(url, options = {}) {
+  const response = await fetchWithAuth(url, options)
   let payload = {}
   try {
     payload = await response.json()
   } catch {
     payload = {}
   }
-
-  _handle401(response)
 
   if (!response.ok) {
     const message = _formatErrorMessage(payload?.detail) || `Request failed (${response.status})`
@@ -52,8 +61,7 @@ export async function fetchJson(url, options = {}) {
 
 export async function fetchJsonWithMeta(url, options = {}) {
   const start = performance.now()
-  const headers = { ..._getAuthHeaders(), ...(options.headers || {}) }
-  const response = await fetch(url, { ...options, headers })
+  const response = await fetchWithAuth(url, options)
   let payload = {}
   try {
     payload = await response.json()
@@ -63,12 +71,30 @@ export async function fetchJsonWithMeta(url, options = {}) {
 
   const durationMs = Math.round(performance.now() - start)
 
-  _handle401(response)
-
   if (!response.ok) {
     const message = _formatErrorMessage(payload?.detail) || `Request failed (${response.status})`
     throw new Error(message)
   }
 
   return { payload, response, durationMs }
+}
+
+export async function fetchJsonRaw(url, options = {}) {
+  const response = await fetchWithAuth(url, options)
+  let payload = {}
+
+  if (response.status !== 304) {
+    try {
+      payload = await response.json()
+    } catch {
+      payload = {}
+    }
+  }
+
+  if (!response.ok && response.status !== 304) {
+    const message = _formatErrorMessage(payload?.detail) || `Request failed (${response.status})`
+    throw new Error(message)
+  }
+
+  return { response, payload }
 }

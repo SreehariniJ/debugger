@@ -3,7 +3,7 @@ import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { Zap, User, Lock, ArrowRight, UserPlus, LogIn } from 'lucide-react'
 import { fetchJson } from './lib/api'
 
-const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+const API = import.meta.env.VITE_API_URL || (window.location.port.startsWith('517') ? 'http://127.0.0.1:8001' : '')
 
 export default function LoginPage({ onLogin }) {
     const [isRegister, setIsRegister] = useState(false)

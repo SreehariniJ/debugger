@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import ast
 import json
+import logging
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 try:
@@ -19,6 +22,22 @@ try:
     import radon.metrics as radon_mi
 except ImportError:  # pragma: no cover - environment dependent
     radon_mi = None
+
+
+from backend.config import (
+    MODEL_ANALYSIS_MAX_TOKENS,
+    MODEL_BATCH_SIZE,
+    MODEL_CONTEXT_TOKENS,
+    MODEL_MAX_OUTPUT_TOKENS,
+    MODEL_PATH,
+    MODEL_RETRY_ATTEMPTS,
+    MODEL_RETRY_TEMPERATURE,
+    MODEL_TEMPERATURE,
+    MODEL_THREADS,
+)
+
+
+logger = logging.getLogger("offline_debugger.model")
 
 
 # Force UTF-8 for Windows console support.
@@ -34,37 +53,21 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+class ModelConfigurationError(RuntimeError):
+    """Raised when the configured LLM cannot be initialized."""
+
+
+class ModelInferenceError(RuntimeError):
+    """Raised when the LLM call fails or produces unusable output."""
+
+
 class DebuggingAgents:
-    def __init__(self, model_path: str = "models/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"):
-        self.model_path = model_path
+    def __init__(self, model_path: str = MODEL_PATH):
+        self.model_path = str(Path(model_path or MODEL_PATH).expanduser().resolve())
         self.llm = None
+        self.initialization_error: str | None = None
         self._lock = threading.Lock()  # llama.cpp is NOT thread-safe
-
-        if _env_flag("OFFLINE_DEBUGGER_DISABLE_MODEL"):
-            print("⚠️ Model loading disabled via OFFLINE_DEBUGGER_DISABLE_MODEL.")
-            return
-
-        if Llama is None:
-            print("⚠️ llama-cpp-python is not installed. LLM features are disabled.")
-            return
-
-        if not os.path.exists(self.model_path):
-            print(f"⚠️ Model not found at {self.model_path}")
-            return
-
-        n_threads = min(os.cpu_count() or 4, 8)
-        try:
-            self.llm = Llama(
-                model_path=self.model_path,
-                n_ctx=2048,
-                n_threads=n_threads,
-                n_batch=128,
-                verbose=False,
-            )
-            print(f"✅ Model loaded on {n_threads} threads")
-        except Exception as exc:  # pragma: no cover - depends on local runtime/GGUF
-            self.llm = None
-            print(f"⚠️ Failed to initialize model: {exc}")
+        self._initialize_model()
 
     def clean_response(self, text: str, start_phrase: str) -> str:
         """Strict filter to keep output concise and parse-safe."""
@@ -83,59 +86,197 @@ class DebuggingAgents:
 
         return f"{start_phrase} {clean_text}"
 
-    def generate_response(self, prompt: str) -> str:
+    def _initialize_model(self) -> None:
+        if _env_flag("OFFLINE_DEBUGGER_DISABLE_MODEL"):
+            self.initialization_error = "Model loading disabled via OFFLINE_DEBUGGER_DISABLE_MODEL."
+            logger.error("MODEL FAILED: %s", self.initialization_error)
+            return
+
+        if Llama is None:
+            self.initialization_error = "llama-cpp-python is not installed."
+            logger.error("MODEL FAILED: %s", self.initialization_error)
+            return
+
+        model_path = Path(self.model_path)
+        if not model_path.exists():
+            self.initialization_error = f"Configured model file was not found at {model_path}"
+            logger.error("MODEL FAILED: %s", self.initialization_error)
+            return
+
+        try:
+            self.llm = Llama(
+                model_path=str(model_path),
+                n_ctx=MODEL_CONTEXT_TOKENS,
+                n_threads=MODEL_THREADS,
+                n_batch=MODEL_BATCH_SIZE,
+                verbose=False,
+            )
+            self.initialization_error = None
+            logger.info(
+                "MODEL LOADED: path=%s threads=%s ctx=%s batch=%s",
+                model_path,
+                MODEL_THREADS,
+                MODEL_CONTEXT_TOKENS,
+                MODEL_BATCH_SIZE,
+            )
+        except Exception as exc:  # pragma: no cover - depends on local runtime/GGUF
+            self.llm = None
+            self.initialization_error = f"Failed to initialize model: {exc}"
+            logger.exception("MODEL FAILED: %s", self.initialization_error)
+
+    def ensure_model_ready(self) -> None:
         if self.llm is None:
-            return "Model unavailable."
+            raise ModelConfigurationError(
+                self.initialization_error or f"Model is unavailable at {self.model_path}"
+            )
+
+    def _extract_json_payload(self, raw: str) -> dict[str, Any]:
+        clean = raw.strip()
+        fenced = re.search(r"```json\s*(\{.*?\})\s*```", clean, re.DOTALL)
+        if fenced:
+            clean = fenced.group(1).strip()
+        else:
+            object_match = re.search(r"\{.*\}", clean, re.DOTALL)
+            if object_match:
+                clean = object_match.group(0).strip()
+
+        try:
+            return json.loads(clean)
+        except json.JSONDecodeError as exc:
+            raise ModelInferenceError(f"Model returned invalid JSON: {exc}") from exc
+
+    def _extract_code_candidate(self, raw: str) -> str:
+        clean = raw.strip()
+        fenced = re.search(r"```(?:python)?\s*(.*?)```", clean, re.DOTALL | re.IGNORECASE)
+        if fenced:
+            clean = fenced.group(1).strip()
+        return clean
+
+    def _ast_signature(self, code_text: str) -> str | None:
+        try:
+            parsed = ast.parse(code_text)
+        except SyntaxError:
+            return None
+        return ast.dump(parsed, annotate_fields=False, include_attributes=False)
+
+    def _validate_generated_fix(self, original_code: str, candidate_text: str) -> str:
+        candidate = self._extract_code_candidate(candidate_text)
+        if not candidate.strip():
+            raise ModelInferenceError("Model inference failed: generated fix was empty.")
+        if candidate.strip() == original_code.strip():
+            raise ModelInferenceError("Model inference failed: generated fix matched the original code.")
+
+        try:
+            ast.parse(candidate)
+        except SyntaxError as exc:
+            raise ModelInferenceError(f"Model inference failed: generated fix is invalid Python ({exc}).") from exc
+
+        original_signature = self._ast_signature(original_code)
+        candidate_signature = self._ast_signature(candidate)
+        if original_signature and candidate_signature and original_signature == candidate_signature:
+            raise ModelInferenceError("Model inference failed: generated fix did not change program behavior.")
+
+        return candidate
+
+    def generate_response(
+        self,
+        prompt: str,
+        *,
+        max_tokens: int = MODEL_ANALYSIS_MAX_TOKENS,
+        temperature: float = MODEL_TEMPERATURE,
+        stop: list[str] | None = None,
+        repeat_penalty: float = 1.1,
+    ) -> str:
+        self.ensure_model_ready()
+        logger.info(
+            "MODEL CALL STARTED: prompt_chars=%s max_tokens=%s temperature=%s",
+            len(prompt),
+            max_tokens,
+            temperature,
+        )
         try:
             with self._lock:
-                output = self.llm(
-                    prompt,
-                    max_tokens=80,
-                    temperature=0.0,
-                    repeat_penalty=1.7,
-                    echo=False,
-                )
-            return output["choices"][0]["text"].strip()
+                call_kwargs = {
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "repeat_penalty": repeat_penalty,
+                    "echo": False,
+                }
+                if stop:
+                    call_kwargs["stop"] = stop
+                output = self.llm(prompt, **call_kwargs)
+            response_text = output["choices"][0]["text"].strip()
         except Exception as exc:  # pragma: no cover - runtime dependent
-            return f"Model error: {exc}"
+            logger.exception("MODEL FAILED: %s", exc)
+            raise ModelInferenceError(f"Model inference failed: {exc}") from exc
+
+        if not response_text:
+            logger.error("MODEL FAILED: empty response received from the model.")
+            raise ModelInferenceError("Model inference failed: empty response received from the model.")
+
+        logger.info("MODEL RESPONSE RECEIVED: chars=%s", len(response_text))
+        return response_text
 
     def multi_agent_pipeline(self, error: str, context: str, knowledge: str) -> dict[str, str]:
         """Consolidate analysis/explanation/verification into one LLM call."""
-        if self.llm is None:
-            return {
-                "analysis": f"The error is {error}.",
-                "explanation": f"Fix: {knowledge}",
-                "status": "Verification needed.",
-            }
-
-        start_marker = "JSON_START"
         prompt = f"""<|im_start|>system
-You are a senior debugging architect. Analyze the error and provide a structured response in JSON.
-{start_marker}
-{{
-  "analysis": "10-word summary of the bug",
-  "explanation": "1-sentence fix suggestion",
-  "status": "Safe or Unsafe (5 words max)"
-}}
+You are an expert Python debugger.
+Given the code, traceback, and supporting notes:
+1. Explain the root cause clearly.
+2. Provide a concise remediation summary.
+3. Respond using exactly these sections and no JSON:
+ANALYSIS:
+<root cause summary>
+EXPLANATION:
+<clear fix summary>
+STATUS:
+<short verdict>
 <|im_end|>
 <|im_start|>user
-Code Context: {context}
-Error Message: {error}
-Local Knowledge: {knowledge}
+Code:
+{context}
+
+Traceback:
+{error}
+
+Supporting Notes:
+{knowledge or "None"}
 <|im_end|>
 <|im_start|>assistant
-{start_marker}
+ANALYSIS:
 """
-        raw = self.generate_response(prompt)
-        try:
-            content = raw.split(start_marker)[-1].strip()
-            return json.loads(content)
-        except Exception:
-            return {
-                "analysis": self.analyzer_agent(error, context),
-                "explanation": self.explainer_agent("Error detected", knowledge),
-                "status": "Verification needed.",
-            }
+
+        last_error: Exception | None = None
+        for attempt_index in range(MODEL_RETRY_ATTEMPTS):
+            temperature = MODEL_TEMPERATURE if attempt_index == 0 else MODEL_RETRY_TEMPERATURE
+            try:
+                raw = self.generate_response(
+                    prompt,
+                    max_tokens=MODEL_ANALYSIS_MAX_TOKENS,
+                    temperature=temperature,
+                )
+                clean = f"ANALYSIS:\n{raw.strip()}"
+                analysis_match = re.search(r"ANALYSIS:\s*(.*?)\s*EXPLANATION:", clean, re.DOTALL | re.IGNORECASE)
+                explanation_match = re.search(
+                    r"EXPLANATION:\s*(.*?)\s*STATUS:",
+                    clean,
+                    re.DOTALL | re.IGNORECASE,
+                )
+                status_match = re.search(r"STATUS:\s*(.*)$", clean, re.DOTALL | re.IGNORECASE)
+                analysis = analysis_match.group(1).strip() if analysis_match else ""
+                explanation = explanation_match.group(1).strip() if explanation_match else ""
+                status = status_match.group(1).strip() if status_match else ""
+                if not analysis or not explanation or not status:
+                    raise ModelInferenceError("Model returned incomplete structured analysis.")
+                return {
+                    "analysis": analysis,
+                    "explanation": explanation,
+                    "status": status,
+                }
+            except (ModelInferenceError, ModelConfigurationError) as exc:
+                last_error = exc
+
+        raise ModelInferenceError(f"Model inference failed: {last_error}")
 
     def analyzer_agent(self, error: str, context: str) -> str:
         start = "The error is"
@@ -167,68 +308,73 @@ Local Knowledge: {knowledge}
         return self.clean_response(raw, start)
 
     def _heuristic_fallback_fix(self, context: str, error: str) -> str:
-        if "ZeroDivisionError" in error and "result = num / denom" in context:
-            return context.replace(
-                "result = num / denom",
-                (
-                    "if denom != 0:\n"
-                    "    result = num / denom\n"
-                    "else:\n"
-                    "    result = 0\n"
-                    "    print('Handled zero denominator safely')"
-                ),
-            )
-        return (
-            "# Auto-fix skipped: model unavailable or low-confidence generation.\n"
-            "# Original code is preserved below.\n"
-            f"{context}"
-        )
+        raise ModelInferenceError("Heuristic fallback is disabled. The debugger requires a real model response.")
 
     def code_fixer_agent(self, context: str, error: str, attempt: int = 1) -> str:
         """Rewrite script to fix detected error using guarded prompting."""
-        if self.llm is None:
-            return self._heuristic_fallback_fix(context, error)
+        self.ensure_model_ready()
+        last_error: Exception | None = None
 
-        retry_tip = ""
-        if attempt > 1:
-            retry_tip = (
-                "\n[CRITIC FEEDBACK] Previous fix failed validation."
-                " Simplify logic and avoid security risks."
-            )
+        for retry_index in range(MODEL_RETRY_ATTEMPTS):
+            current_attempt = attempt + retry_index
+            retry_tip = ""
+            if current_attempt > 1:
+                retry_tip = (
+                    "\nPrevious output was rejected. The next answer must fix the traceback,"
+                    " change the program meaningfully, and return executable Python."
+                )
 
-        prompt = f"""<|im_start|>system
-You are an expert Python developer. Fix the bug with minimal, safe edits.
-1. Identify the crashing line.
-2. Apply the smallest valid correction.
-3. Keep behavior intact unless required for safety.{retry_tip}
-Return ONLY corrected code inside a ```python block.<|im_end|>
+            prompt = f"""<|im_start|>system
+You are an expert Python debugger.
+Given code and traceback:
+1. Explain the root cause clearly.
+2. Provide corrected code ONLY.
+3. Ensure the fix is executable and resolves the error.
+Respond using exactly this format:
+ROOT_CAUSE:
+<short explanation>
+FIXED_CODE:
+```python
+<corrected Python code>
+```{retry_tip}
+<|im_end|>
 <|im_start|>user
-Buggy Code:
+Code:
 {context}
 
-Error:
+Traceback:
 {error}
-
-Fixed Code:<|im_end|>
+<|im_end|>
 <|im_start|>assistant
-```python"""
+ROOT_CAUSE:
+"""
 
-        try:
-            with self._lock:
-                output = self.llm(
+            try:
+                raw = self.generate_response(
                     prompt,
-                    max_tokens=1024,
-                    temperature=0.01 if attempt == 1 else 0.4,
-                    stop=["<|im_end|>", "```"],
-                    echo=False,
+                    max_tokens=MODEL_MAX_OUTPUT_TOKENS,
+                    temperature=MODEL_TEMPERATURE if current_attempt == 1 else MODEL_RETRY_TEMPERATURE,
                 )
-            fixed = output["choices"][0]["text"].strip()
-        except Exception:
-            return self._heuristic_fallback_fix(context, error)
+                clean = f"ROOT_CAUSE:\n{raw.strip()}"
+                root_cause_match = re.search(
+                    r"ROOT_CAUSE:\s*(.*?)\s*FIXED_CODE:",
+                    clean,
+                    re.DOTALL | re.IGNORECASE,
+                )
+                code_match = re.search(
+                    r"FIXED_CODE:\s*```(?:python)?\s*(.*?)```",
+                    clean,
+                    re.DOTALL | re.IGNORECASE,
+                )
+                root_cause = root_cause_match.group(1).strip() if root_cause_match else ""
+                fixed = self._validate_generated_fix(context, code_match.group(1).strip() if code_match else "")
+                if not root_cause:
+                    raise ModelInferenceError("Model inference failed: missing root cause explanation.")
+                return fixed
+            except (ModelInferenceError, ModelConfigurationError) as exc:
+                last_error = exc
 
-        if len(fixed) < 10 or fixed.strip() == context.strip():
-            return self._heuristic_fallback_fix(context, error)
-        return fixed
+        raise ModelInferenceError(f"Model inference failed: {last_error}")
 
     def researcher_agent(self, error: str, context: str, workspace_files: list[dict[str, Any]]) -> list[str]:
         """Identify relevant files based on imports/error keywords."""
@@ -286,13 +432,7 @@ Fixed Code:<|im_end|>
         self, error: str, context: str, workspace_files: list[dict[str, Any]]
     ) -> dict[str, Any]:
         """Orchestrated multi-agent loop with research and critique."""
-        if self.llm is None:
-            return {
-                "success": False,
-                "fix": "",
-                "reason": "LLM unavailable; orchestration skipped.",
-                "path_taken": "LLM unavailable fallback",
-            }
+        self.ensure_model_ready()
 
         relevant_paths = self.researcher_agent(error, context, workspace_files)
         augmented_context = context
@@ -305,7 +445,7 @@ Fixed Code:<|im_end|>
 
         best_fix = ""
         last_reason = None
-        for attempt in range(1, 3):
+        for attempt in range(1, MODEL_RETRY_ATTEMPTS + 1):
             candidate = self.code_fixer_agent(augmented_context, error, attempt)
             report = self.critic_agent(context, candidate)
             if report["valid"]:
@@ -318,12 +458,9 @@ Fixed Code:<|im_end|>
             last_reason = report["reason"]
             best_fix = candidate
 
-        return {
-            "success": False,
-            "fix": best_fix,
-            "reason": f"Fix candidate failed validation: {last_reason}",
-            "path_taken": "Viper fallback (no valid fix found within constraints)",
-        }
+        raise ModelInferenceError(
+            f"Model inference failed: fix candidate did not pass validation ({last_reason or 'unknown reason'})."
+        )
 
     def severity_agent(self, error: str) -> str:
         error_lower = error.lower()

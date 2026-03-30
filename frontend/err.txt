@@ -1,0 +1,24 @@
+[31mâœ—[39m Build failed in 674ms
+[31merror during build:
+[31m[vite:esbuild] Transform failed with 1 error:
+C:/Users/Sreeharini/offline_debugger/frontend/src/components/PipelineComponents.jsx:3:151: ERROR: The symbol "FileText" has already been declared[31m
+file: [36mC:/Users/Sreeharini/offline_debugger/frontend/src/components/PipelineComponents.jsx:3:151[31m
+[33m
+[33mThe symbol "FileText" has already been declared[33m
+1  |  import React from 'react';
+2  |  import { motion as Motion } from 'framer-motion';
+3  |  ..., AlertCircle, AlertTriangle, Eye, EyeOff, Clipboard, Copy, FileText, ShieldAlert } from 'lucide-react';
+   |                                                                 ^
+4  |  
+5  |  export const ViperHeader = React.memo(({ result }) => {
+[31m
+    at failureErrorWithLog (C:\Users\Sreeharini\offline_debugger\frontend\node_modules\esbuild\lib\main.js:1467:15)
+    at C:\Users\Sreeharini\offline_debugger\frontend\node_modules\esbuild\lib\main.js:736:50
+    at responseCallbacks.<computed> (C:\Users\Sreeharini\offline_debugger\frontend\node_modules\esbuild\lib\main.js:603:9)
+    at handleIncomingPacket (C:\Users\Sreeharini\offline_debugger\frontend\node_modules\esbuild\lib\main.js:658:12)
+    at Socket.readFromStdout (C:\Users\Sreeharini\offline_debugger\frontend\node_modules\esbuild\lib\main.js:581:7)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)[39m

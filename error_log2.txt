@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "C:\Users\Sreeharini\offline_debugger\test_run2.py", line 4, in <module>
+    import main
+  File "C:\Users\Sreeharini\offline_debugger\main.py", line 16, in <module>
+    from backend.routers import (
+    ...<2 lines>...
+    )
+  File "C:\Users\Sreeharini\offline_debugger\backend\routers\__init__.py", line 1, in <module>
+    from . import auth, debug, system, workspace, runtime, profiling, visualization, sessions, teams, comments
+  File "C:\Users\Sreeharini\offline_debugger\backend\routers\sessions.py", line 6, in <module>
+    from backend.schemas import StrictModel, UserProfile
+ImportError: cannot import name 'UserProfile' from 'backend.schemas' (C:\Users\Sreeharini\offline_debugger\backend\schemas.py)

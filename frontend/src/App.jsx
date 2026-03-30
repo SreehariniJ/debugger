@@ -19,10 +19,10 @@ import {
   BarChart3, RefreshCcw, Clock3, ListChecks,
   LogOut
 } from 'lucide-react'
-import { fetchJson, fetchJsonWithMeta } from './lib/api'
+import { fetchJson, fetchJsonRaw, fetchJsonWithMeta } from './lib/api'
 import LoginPage from './LoginPage'
-
-const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+import { CollaborationTab, SharedSessionList, SessionCollaboration } from './components/Collaboration'
+const API = import.meta.env.VITE_API_URL || (window.location.port.startsWith('517') ? 'http://127.0.0.1:8001' : '')
 const HISTORY_STORAGE_KEY = 'offline_debugger_history_v1'
 const MODE_STORAGE_KEY = 'offline_debugger_mode_v1'
 
@@ -34,11 +34,62 @@ const SEVERITY_CONFIG = {
 
 const GRADE_COLORS = { A: '#34d399', B: '#60a5fa', C: '#fbbf24', D: '#fb923c', F: '#f87171' }
 const LOADING_MESSAGES = [
-  'Initializing Neural Pipeline...',
-  'Performing Multi-Agent Consensus...',
-  'Analyzing Security Surface...',
-  'Synthesizing Optimal Fix...',
+  'Running your code...',
+  'Capturing traceback...',
+  'Analyzing the root cause...',
+  'Preparing a suggested fix...',
 ]
+const SAMPLE_BUG = `def divide(a, b):
+    return a / b
+
+print(divide(10, 0))
+`
+const TAB_META = {
+  debug: ['Debug Code', 'Paste or upload Python code to detect runtime errors and generate a fix.'],
+  collaboration: ['Collaboration', 'Work with your team on shared debugging sessions.'],
+  workspace: ['Workspace', 'Browse and debug files from your project.'],
+  insights: ['Insights', 'Understand code structure and complexity.'],
+  security: ['Security Audit', 'Review static security issues.'],
+  metrics: ['Metrics', 'System performance and backend health.'],
+  terminal: ['Execution Trace', 'View stdout, stderr, and runtime details.']
+}
+
+function formatDuration(seconds) {
+  if (typeof seconds !== 'number' || Number.isNaN(seconds)) return 'N/A'
+  if (seconds < 1) return `${Math.round(seconds * 1000)} ms`
+  return `${seconds.toFixed(seconds >= 10 ? 1 : 2)} s`
+}
+
+function getRunTargetLabel(result, mode, fallbackPath = '') {
+  if (result?.source_path) {
+    const normalized = result.source_path.split(/[\\/]/)
+    return normalized[normalized.length - 1] || result.source_path
+  }
+  if (mode === 'paste') return 'Pasted Snippet'
+  if (!fallbackPath) return 'Uploaded File'
+  const normalized = fallbackPath.split(/[\\/]/)
+  return normalized[normalized.length - 1] || fallbackPath
+}
+
+function getFailureHeadline(result) {
+  if (result?.error_type) return result.error_type
+  const firstLine = (result?.stderr || result?.error || '')
+    .split('\n')
+    .map(line => line.trim())
+    .find(Boolean)
+  return firstLine || 'Runtime Error'
+}
+
+function getFailureReason(result) {
+  if (result?.analysis) return result.analysis
+  if (result?.stderr) {
+    const lines = result.stderr.split('\n').map(line => line.trim()).filter(Boolean)
+    if (lines.length > 0) return lines.slice(-2).join(' ')
+  }
+  if (result?.timed_out) return 'The run timed out before the program completed.'
+  if (typeof result?.exit_code === 'number') return `The program exited with code ${result.exit_code}.`
+  return 'The latest run failed, but no additional explanation was returned.'
+}
 
 function formatRelativeAge(epochSeconds) {
   if (!epochSeconds) return 'N/A'
@@ -57,6 +108,81 @@ function DiffLine({ line }) {
   return <div style={{ background: bg, color, fontFamily: 'monospace', fontSize: '0.82rem', padding: '0 0.75rem', lineHeight: '1.7', whiteSpace: 'pre' }}>{line}</div>
 }
 
+function EmptyStateCard({
+  icon: Icon = Info,
+  title,
+  description,
+  actionLabel,
+  onAction,
+  tone = 'default',
+  compact = false
+}) {
+  const toneStyles = tone === 'error'
+    ? { border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.05)', icon: 'var(--error)' }
+    : { border: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)', icon: 'var(--accent)' }
+
+  return (
+    <div
+      className="card glass"
+      style={{
+        textAlign: 'center',
+        padding: compact ? '1.5rem' : '2.5rem',
+        border: toneStyles.border,
+        background: toneStyles.background
+      }}
+    >
+      <Icon size={compact ? 32 : 40} color={toneStyles.icon} style={{ marginBottom: '1rem', opacity: 0.9 }} />
+      <h3 style={{ marginBottom: '0.5rem' }}>{title}</h3>
+      <p style={{ color: 'var(--text-secondary)', margin: '0 auto', maxWidth: '42rem', lineHeight: 1.6 }}>
+        {description}
+      </p>
+      {actionLabel && onAction && (
+        <button
+          className="btn btn-secondary"
+          type="button"
+          onClick={onAction}
+          style={{ marginTop: '1rem', justifyContent: 'center' }}
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function TabHeader({ tabKey, titleOverride, descriptionOverride, actions = null }) {
+  const [defaultTitle, defaultDescription] = TAB_META[tabKey] || ['Overview', '']
+
+  return (
+    <div
+      className="card glass"
+      style={{
+        marginBottom: '1rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: '1.5rem',
+        flexWrap: 'wrap'
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 800, marginBottom: '0.55rem' }}>
+          {defaultTitle}
+        </div>
+        <h2 style={{ marginBottom: '0.5rem' }}>{titleOverride || defaultTitle}</h2>
+        <p style={{ color: 'var(--text-secondary)', margin: 0, maxWidth: '52rem', lineHeight: 1.6 }}>
+          {descriptionOverride || defaultDescription}
+        </p>
+      </div>
+      {actions && (
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {actions}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function StatCard({ label, value, icon, color }) {
   const StatIcon = icon
   return (
@@ -66,6 +192,42 @@ function StatCard({ label, value, icon, color }) {
       </div>
       <div style={{ fontSize: '1.25rem', fontWeight: 700, color: color || 'var(--text-main)' }}>{value}</div>
     </div>
+  )
+}
+
+function Toast({ message, type = 'info', onClose }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000)
+    return () => clearTimeout(timer)
+  }, [onClose])
+  
+  const bg = type === 'error' ? 'rgba(239, 68, 68, 0.95)' : type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(59, 130, 246, 0.95)';
+  return (
+    <Motion.div
+      initial={{ opacity: 0, y: 50, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      style={{
+        background: bg,
+        color: 'white',
+        padding: '0.85rem 1.25rem',
+        borderRadius: '0.5rem',
+        marginBottom: '0.75rem',
+        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
+        fontWeight: 600,
+        fontSize: '0.85rem',
+        pointerEvents: 'auto',
+        border: '1px solid rgba(255,255,255,0.2)'
+      }}
+    >
+      {type === 'error' && <AlertCircle size={18} />}
+      {type === 'success' && <CheckCircle2 size={18} />}
+      {type === 'info' && <Info size={18} />}
+      {message}
+    </Motion.div>
   )
 }
 
@@ -158,7 +320,7 @@ function WorkspacePanel({
           </button>
         </div>
         <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '0.5rem' }}>
-          Indexing: <strong style={{ color: 'var(--accent)' }}>{files.length}</strong> Python files detected in this scope.
+          Showing <strong style={{ color: 'var(--accent)' }}>{files.length}</strong> Python file{files.length === 1 ? '' : 's'} in the current workspace view.
         </div>
       </div>
 
@@ -186,47 +348,68 @@ function WorkspacePanel({
           </button>
         </div>
       </div>
-      <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-        <table className="elite-table">
-          <thead>
-            <tr>
-              <th style={{ width: '42px' }}>Pick</th>
-              <th>File Name</th>
-              <th>Path</th>
-              <th>Size</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {files.map((file, idx) => (
-              <tr key={idx}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selectedPaths.includes(file.path)}
-                    onChange={() => onTogglePath(file.path)}
-                    aria-label={`Select ${file.rel_path}`}
-                  />
-                </td>
-                <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{file.name}</td>
-                <td style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>{file.rel_path}</td>
-                <td style={{ color: 'var(--text-secondary)' }}>{(file.size / 1024).toFixed(1)} KB</td>
-                <td>
-                  <button className="btn btn-secondary btn-sm" onClick={() => onSelectFile(file.path)}>
-                    <EyeOff size={14} /> Debug
-                  </button>
-                </td>
+      {files.length === 0 ? (
+        <EmptyStateCard
+          icon={Layout}
+          title="No Python files found"
+          description="Choose a project folder or adjust the workspace filter to start debugging files from your project."
+          actionLabel="Select Folder"
+          onAction={handlePickProject}
+        />
+      ) : (
+        <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+          <table className="elite-table">
+            <thead>
+              <tr>
+                <th style={{ width: '42px' }}>Pick</th>
+                <th>File Name</th>
+                <th>Path</th>
+                <th>Size</th>
+                <th>Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {files.map((file, idx) => (
+                <tr key={idx}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedPaths.includes(file.path)}
+                      onChange={() => onTogglePath(file.path)}
+                      aria-label={`Select ${file.rel_path}`}
+                    />
+                  </td>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{file.name}</td>
+                  <td style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>{file.rel_path}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{(file.size / 1024).toFixed(1)} KB</td>
+                  <td>
+                    <button className="btn btn-secondary btn-sm" onClick={() => onSelectFile(file.path)}>
+                      <Zap size={14} /> Debug File
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Motion.div>
   )
 }
 
-function ComplexityPanel({ data }) {
-  if (!data || (data.functions === 0 && data.classes === 0)) return null
+function ComplexityPanel({ data, onOpenDebug }) {
+  if (!data || (data.functions === 0 && data.classes === 0)) {
+    return (
+      <EmptyStateCard
+        icon={Activity}
+        title="Complexity summary unavailable"
+        description="Run a debug session to see complexity metrics for the current file."
+        actionLabel="Open Debug"
+        onAction={onOpenDebug}
+        compact
+      />
+    )
+  }
   const grade = data.grade
   const gradeColor = GRADE_COLORS[grade] || '#a1a1aa'
   return (
@@ -286,8 +469,18 @@ const RadarChart = ({ score }) => {
   );
 };
 
-function SecurityPanel({ data }) {
-  if (!data) return null;
+function SecurityPanel({ data, onOpenDebug }) {
+  if (!data) {
+    return (
+      <EmptyStateCard
+        icon={Shield}
+        title="No security audit available"
+        description="Run a debug session to review static security findings for the latest file."
+        actionLabel="Run Debug"
+        onAction={onOpenDebug}
+      />
+    )
+  }
   const issues = data.issues || [];
   return (
     <Motion.div
@@ -304,7 +497,7 @@ function SecurityPanel({ data }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--accent)', fontWeight: 800, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '1rem' }}>
-            <Shield size={16} color="var(--accent)" /> ELITE SECURITY AUDIT - {data.engine || 'Agentic Core'}
+            <Shield size={16} color="var(--accent)" /> Security Analysis - {data.engine || 'Static Analysis'}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {issues.map((issue, idx) => (
@@ -323,44 +516,70 @@ function SecurityPanel({ data }) {
             ))}
             {issues.length === 0 && (
               <div style={{ color: 'var(--success)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
-                <CheckCircle2 size={16} /> Zero Vulnerabilities Detected by Bandit Engine
+                <CheckCircle2 size={16} /> No security issues detected in the latest scan
               </div>
             )}
           </div>
         </div>
         <div style={{ marginLeft: '1rem', textAlign: 'center' }}>
           <RadarChart score={issues.length > 0 ? (issues.length > 5 ? 10 : 7) : 2} />
-          <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '0.5rem', fontWeight: 700 }}>SURFACE AREA</div>
+          <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: '0.5rem', fontWeight: 700 }}>RISK SURFACE</div>
         </div>
       </div>
     </Motion.div>
   );
 }
-function ViperAnalytics({ result }) {
-  if (!result || !result.metrics) return null
+function ViperAnalytics({ result, onOpenDebug }) {
+  if (!result || !result.metrics) {
+    return (
+      <EmptyStateCard
+        icon={Zap}
+        title="AI summary unavailable"
+        description="Run a debug session to see confidence, verification details, and timing breakdowns."
+        actionLabel="Open Debug"
+        onAction={onOpenDebug}
+        compact
+      />
+    )
+  }
+  const confidenceLabel = typeof result.confidence === 'number' ? `${result.confidence}/10` : 'N/A'
+  const confidencePercent = typeof result.confidence === 'number'
+    ? Math.max(0, Math.min(100, result.confidence * 10))
+    : 0
   return (
     <Motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="card glass" style={{ border: '1px solid var(--accent)', background: 'rgba(168, 85, 247, 0.03)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', color: 'var(--accent)', fontWeight: 800 }}>
-        <Zap size={18} /> VIPER CORE ANALYTICS
+        <Zap size={18} /> AI Debug Summary
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: '1rem' }}>
         <div className="stat-box">
-          <label style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>CONSENSUS PATH</label>
+          <label style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>VERIFICATION PATH</label>
           <div style={{ fontSize: '0.75rem', fontWeight: 600 }}>{result.verification?.toUpperCase() || 'STANDARD'}</div>
         </div>
         <div className="stat-box">
           <label style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>AI CONFIDENCE</label>
-          <div style={{ fontSize: '1rem', fontWeight: 800, color: result.confidence > 7 ? 'var(--success)' : 'var(--warning)' }}>{result.confidence}/10</div>
+          <div style={{ fontSize: '1rem', fontWeight: 800, color: result.confidence > 7 ? 'var(--success)' : 'var(--warning)' }}>{confidenceLabel}</div>
+          <div style={{ marginTop: '0.45rem', height: '8px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${confidencePercent}%`,
+                height: '100%',
+                borderRadius: '999px',
+                background: result.confidence > 7 ? 'var(--success)' : 'var(--warning)',
+                transition: 'width 0.3s ease'
+              }}
+            />
+          </div>
         </div>
         <div className="stat-box">
-          <label style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>PIPELINE MODE</label>
+          <label style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>DEBUG MODE</label>
           <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>
             {result.metrics.fast_mode === 1 ? 'FAST' : 'FULL'}
           </div>
         </div>
       </div>
       <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '0.5rem', fontSize: '0.75rem' }}>
-        <div style={{ color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>INTERNAL PROCESSING (MS)</div>
+        <div style={{ color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>PROCESSING TIME (MS)</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
           <span>Research Phase</span>
           <span>{((result.metrics.scan_rag || result.metrics.viper_orchestration / 2) * 1000).toFixed(0)}ms</span>
@@ -379,7 +598,7 @@ function ViperEditor({ original, fixed = '', onEdit }) {
     <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1px', background: 'var(--border)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
       <div style={{ background: 'var(--bg-main)', padding: '1rem' }}>
         <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <EyeOff size={12} /> ORIGINAL BUFFER
+          <EyeOff size={12} /> ORIGINAL CODE
         </div>
         <SyntaxHighlighter language="python" style={vscDarkPlus} showLineNumbers={true} customStyle={{ margin: 0, padding: 0, fontSize: '0.8rem', background: 'transparent', height: '100%', minHeight: '300px' }}>
           {original}
@@ -387,8 +606,8 @@ function ViperEditor({ original, fixed = '', onEdit }) {
       </div>
       <div style={{ background: 'rgba(16,185,129,0.03)', padding: '1rem' }}>
         <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--success)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><CheckCircle2 size={12} /> VIPER PATCH (EDITABLE)</div>
-          {fixed.length > 500 && <span style={{ opacity: 0.5 }}>SYNTHESIZED</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><CheckCircle2 size={12} /> SUGGESTED FIX (EDITABLE)</div>
+          {fixed.length > 500 && <span style={{ opacity: 0.5 }}>AI GENERATED</span>}
         </div>
         <textarea
           style={{ width: '100%', height: 'calc(100% - 20px)', minHeight: '300px', background: 'transparent', border: 'none', color: '#e4e4e7', fontFamily: 'monospace', fontSize: '0.8rem', resize: 'none', outline: 'none', lineHeight: '1.5' }}
@@ -400,26 +619,39 @@ function ViperEditor({ original, fixed = '', onEdit }) {
   )
 }
 
+function buildExecutionTraceText(result, loading) {
+  if (loading) return 'Running debug...'
+  if (!result) return 'Run a debug session to view stdout, stderr, and exit details.'
+
+  const sections = [
+    `Backend: ${result.execution_backend || 'unknown'}`,
+    `Exit Code: ${result.exit_code ?? 'n/a'}`,
+    `Timed Out: ${result.timed_out ? 'yes' : 'no'}`
+  ]
+
+  if (result.error_type) sections.push(`Error Type: ${result.error_type}`)
+  if (typeof result.error_line === 'number') sections.push(`Error Line: ${result.error_line}`)
+  if (result.stdout) sections.push(`\n[stdout]\n${result.stdout}`)
+  if (result.stderr) sections.push(`\n[stderr]\n${result.stderr}`)
+
+  if (!result.stdout && !result.stderr) {
+    sections.push('\n[output]\nNo stdout/stderr captured for this run.')
+  }
+
+  return sections.join('\n')
+}
+
 function TerminalPanel({ result, loading }) {
   return (
-    <div className="card">
-      <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <Terminal size={20} /> Execution Log
-      </h3>
-      <div style={{ borderRadius: '0.75rem', border: '1px solid var(--border)', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
-        <SyntaxHighlighter
-          language="text"
-          style={vscDarkPlus}
-          showLineNumbers={true}
-          customStyle={{ margin: 0, padding: '1rem', fontSize: '0.8rem', background: 'transparent', minHeight: '280px' }}
-        >
-          {loading
-            ? 'Running debug pipeline...'
-            : result
-              ? JSON.stringify(result, null, 2)
-              : 'No session output yet.'}
-        </SyntaxHighlighter>
-      </div>
+    <div style={{ borderRadius: '0.75rem', border: '1px solid var(--border)', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
+      <SyntaxHighlighter
+        language="text"
+        style={vscDarkPlus}
+        showLineNumbers={true}
+        customStyle={{ margin: 0, padding: '1rem', fontSize: '0.8rem', background: 'transparent', minHeight: '280px' }}
+      >
+        {buildExecutionTraceText(result, loading)}
+      </SyntaxHighlighter>
     </div>
   )
 }
@@ -492,7 +724,17 @@ function InsightsPanel({ insights, loading, error, onRefresh }) {
     )
   }
 
-  if (!insights) return null
+  if (!insights) {
+    return (
+      <EmptyStateCard
+        icon={BarChart3}
+        title="Insights are not available yet"
+        description="Refresh the workspace analysis to view file counts, hotspots, and complexity trends."
+        actionLabel="Refresh Insights"
+        onAction={() => onRefresh(true)}
+      />
+    )
+  }
   const grades = insights.grade_distribution || {}
   const generatedAge = formatRelativeAge(insights.generated_at)
 
@@ -549,32 +791,40 @@ function InsightsPanel({ insights, loading, error, onRefresh }) {
       <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))' }}>
         <div className="card">
           <h3 style={{ marginBottom: '0.8rem', fontSize: '0.95rem' }}>Complexity Hotspots</h3>
-          <div className="insights-list">
-            {(insights.hotspots || []).map((file, idx) => (
-              <div className="insights-row" key={`${file.rel_path}-${idx}`}>
-                <div style={{ minWidth: 0 }}>
-                  <div className="insights-title">{file.rel_path}</div>
-                  <div className="insights-sub">Grade {file.grade} | LOC {file.loc}</div>
+          {(insights.hotspots || []).length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)', margin: 0 }}>No complexity hotspots detected in the current workspace.</p>
+          ) : (
+            <div className="insights-list">
+              {(insights.hotspots || []).map((file, idx) => (
+                <div className="insights-row" key={`${file.rel_path}-${idx}`}>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="insights-title">{file.rel_path}</div>
+                    <div className="insights-sub">Grade {file.grade} | LOC {file.loc}</div>
+                  </div>
+                  <div className="insights-score">{file.complexity_score}</div>
                 </div>
-                <div className="insights-score">{file.complexity_score}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="card">
           <h3 style={{ marginBottom: '0.8rem', fontSize: '0.95rem' }}>Largest Files</h3>
-          <div className="insights-list">
-            {(insights.largest_files || []).map((file, idx) => (
-              <div className="insights-row" key={`${file.rel_path}-${idx}`}>
-                <div style={{ minWidth: 0 }}>
-                  <div className="insights-title">{file.rel_path}</div>
-                  <div className="insights-sub">{(file.size / 1024).toFixed(1)} KB</div>
+          {(insights.largest_files || []).length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)', margin: 0 }}>No large files are available to display yet.</p>
+          ) : (
+            <div className="insights-list">
+              {(insights.largest_files || []).map((file, idx) => (
+                <div className="insights-row" key={`${file.rel_path}-${idx}`}>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="insights-title">{file.rel_path}</div>
+                    <div className="insights-sub">{(file.size / 1024).toFixed(1)} KB</div>
+                  </div>
+                  <div className="insights-score">{file.loc}</div>
                 </div>
-                <div className="insights-score">{file.loc}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -604,7 +854,17 @@ function MetricsPanel({ metrics, loading, error, onRefresh }) {
     )
   }
 
-  if (!metrics) return null
+  if (!metrics) {
+    return (
+      <EmptyStateCard
+        icon={Activity}
+        title="Metrics are not available yet"
+        description="Refresh backend metrics to view uptime, capacity, and cache health."
+        actionLabel="Refresh Metrics"
+        onAction={onRefresh}
+      />
+    )
+  }
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
       <div className="card glass">
@@ -654,6 +914,10 @@ function MetricsPanel({ metrics, loading, error, onRefresh }) {
   )
 }
 
+export const globalToastManager = {
+  addToast: (message, type) => console.log("Toast miss:", message)
+};
+
 function App() {
   const [authUser, setAuthUser] = useState(() => {
     try {
@@ -663,12 +927,40 @@ function App() {
       return null
     } catch { return null }
   })
+  
+  const [toasts, setToasts] = useState([])
+  const [isVerifyingSession, setIsVerifyingSession] = useState(!!authUser)
+
+  globalToastManager.addToast = useCallback((message, type = 'info') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, message, type }])
+  }, [])
+
+  const removeToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
 
   useEffect(() => {
-    const handleExpired = () => setAuthUser(null)
+    const handleExpired = (e) => {
+      setAuthUser(null)
+      if (e && e.detail && typeof e.detail === 'string') {
+         globalToastManager.addToast(e.detail, 'error')
+      }
+    }
     window.addEventListener('auth_expired', handleExpired)
     return () => window.removeEventListener('auth_expired', handleExpired)
   }, [])
+
+  useEffect(() => {
+    if (authUser) {
+      setIsVerifyingSession(true)
+      fetchJson(`${API}/auth/me`)
+        .then(() => setIsVerifyingSession(false))
+        .catch(() => setIsVerifyingSession(false))
+    } else {
+      setIsVerifyingSession(false)
+    }
+  }, [authUser])
 
   const handleLogin = (user) => setAuthUser(user)
 
@@ -678,16 +970,38 @@ function App() {
     setAuthUser(null)
   }
 
-  if (!authUser) {
-    return <LoginPage onLogin={handleLogin} />
-  }
+  return (
+    <>
+      {isVerifyingSession ? (
+         <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', color: 'var(--text-secondary)', fontWeight: 800 }}>
+                    <RefreshCcw size={28} className="spin" color="var(--accent)" />
+                Checking your session...
+                </div>
+         </div>
+      ) : !authUser ? (
+         <LoginPage onLogin={handleLogin} />
+      ) : (
+         <MainApp authUser={authUser} onLogout={handleLogout} />
+      )}
 
-  return <MainApp authUser={authUser} onLogout={handleLogout} />
+      {/* Global Toast Container */}
+      <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 9999, pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        <AnimatePresence>
+          {toasts.map(t => (
+            <Toast key={t.id} message={t.message} type={t.type} onClose={() => removeToast(t.id)} />
+          ))}
+        </AnimatePresence>
+      </div>
+    </>
+  )
 }
 
 function MainApp({ authUser, onLogout }) {
 
-  const [activeTab, setActiveTab] = useState('debug'); // debug, workspace, insights, security, metrics, terminal
+  const [activeTab, setActiveTab] = useState('debug'); // debug, workspace, insights, security, metrics, terminal, collaboration
+  const [activeSession, setActiveSession] = useState(null);
+  const addToast = globalToastManager.addToast;
   const [mode, setMode] = useState('paste'); // paste, upload
   const [filePath, setFilePath] = useState('test_logic.py')
   const [pasteCode, setPasteCode] = useState('')
@@ -737,6 +1051,8 @@ function MainApp({ authUser, onLogout }) {
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [paletteQuery, setPaletteQuery] = useState('')
   const traceRef = useRef(null)
+  const fixPanelRef = useRef(null)
+  const debugUploadInputRef = useRef(null)
   const modeInitializedRef = useRef(false)
   const requestControllerRef = useRef(null)
   const insightsEtagRef = useRef('')
@@ -799,6 +1115,14 @@ function MainApp({ authUser, onLogout }) {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!result || result.success || !result.fixed_code) return
+    const frame = window.requestAnimationFrame(() => {
+      fixPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [result])
 
   useEffect(() => {
     try {
@@ -970,21 +1294,9 @@ function MainApp({ authUser, onLogout }) {
       if (!forceRefresh && insightsEtagRef.current) {
         headers['If-None-Match'] = insightsEtagRef.current
       }
-      const response = await fetch(endpoint, { headers })
+      const { response, payload: data } = await fetchJsonRaw(endpoint, { headers })
       if (response.status === 304) {
         return
-      }
-
-      let data = {}
-      try {
-        data = await response.json()
-      } catch {
-        data = {}
-      }
-
-      if (!response.ok) {
-        const message = data?.detail || `Request failed (${response.status})`
-        throw new Error(message)
       }
 
       const etag = response.headers.get('etag')
@@ -1012,7 +1324,35 @@ function MainApp({ authUser, onLogout }) {
     }
   }
 
-  const runDebug = useCallback(async (fp, showLoader = true) => {
+  const persistDebugSession = useCallback(async (data, resolvedMode, resolvedPath, isCached) => {
+    if (isCached || data?.success) return
+
+    const title = resolvedMode === 'paste'
+      ? 'Snippet Debug Session'
+      : (resolvedPath?.split(/[\\/]/).pop() || 'Debug Session')
+
+    try {
+      await fetchJson(`${API}/sessions/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          error: data.error || data.stderr || 'Execution failed',
+          analysis: data.analysis || data.explanation || null,
+          fixed_code: data.fixed_code || null,
+          source_path: resolvedPath || null,
+          severity: data.severity || null,
+          pipeline_mode: data.pipeline_mode || debugMode
+        })
+      })
+    } catch (error) {
+      console.error('Failed to persist debug session:', error)
+    }
+  }, [debugMode])
+
+  const runDebug = useCallback(async (fp, showLoader = true, overrideMode = null) => {
+    const resolvedMode = overrideMode || mode
+    const activePath = fp || filePath
     if (showLoader) {
       setLoading(true)
       setResult(null)
@@ -1020,7 +1360,7 @@ function MainApp({ authUser, onLogout }) {
       setShowDiff(false)
       setFixValidation(null)
     }
-    setStatus(`Monitoring (${debugMode.toUpperCase()})...`)
+    setStatus(`Running debug (${debugMode.toUpperCase()} mode)...`)
     if (requestControllerRef.current) {
       requestControllerRef.current.abort()
     }
@@ -1028,7 +1368,7 @@ function MainApp({ authUser, onLogout }) {
     requestControllerRef.current = controller
     try {
       let data
-      if (mode === 'paste') {
+      if (resolvedMode === 'paste') {
         data = await fetchJson(`${API}/debug_snippet`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1039,37 +1379,44 @@ function MainApp({ authUser, onLogout }) {
         data = await fetchJson(`${API}/debug`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_path: fp || filePath, mode: debugMode }),
+          body: JSON.stringify({ file_path: activePath, mode: debugMode }),
           signal: controller.signal
         })
       }
       const isCached = data.metrics?.cache_status === 1.0
-      const resolvedPath = data.source_path || fp || filePath
-      setFilePath(resolvedPath)
+      const resolvedPath = data.source_path || activePath || filePath
+      if (resolvedPath) {
+        setFilePath(resolvedPath)
+      }
 
       if (data.success) {
-        setStatus(isCached ? 'Cached: no errors' : 'System stable')
+        addToast('Debug run completed. No runtime errors detected.', 'success')
+        setStatus(isCached ? 'No issues found (cached result)' : 'No issues found')
         setHistory(prev => [{
-          file: mode === 'paste' ? (pasteCode.split('\n')[0].slice(0, 30).trim() || 'Code Fragment') : (fp || filePath),
+          file: resolvedMode === 'paste' ? (pasteCode.split('\n')[0].slice(0, 30).trim() || 'Code Fragment') : resolvedPath,
           status: 'clean',
           time: data.total_time || 0,
           id: Date.now(),
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          full_content: mode === 'paste' ? pasteCode : null,
-          id_path: resolvedPath
+          full_content: resolvedMode === 'paste' ? pasteCode : null,
+          id_path: resolvedPath,
+          mode: resolvedMode
         }, ...prev].slice(0, 10))
       } else {
-        setStatus(isCached ? 'Cached: anomaly detected' : 'Anomaly detected')
+        addToast(data.fixed_code ? 'Runtime error detected. A suggested fix is ready for review.' : 'Runtime error detected. Review the execution trace.', 'info')
+        setStatus(isCached ? 'Error found (cached result)' : 'Error found')
         setHistory(prev => [{
-          file: mode === 'paste' ? (pasteCode.split('\n')[0].slice(0, 30).trim() || 'Code Fragment') : (fp || filePath),
-          status: 'fixed',
+          file: resolvedMode === 'paste' ? (pasteCode.split('\n')[0].slice(0, 30).trim() || 'Code Fragment') : resolvedPath,
+          status: 'anomaly',
           time: data.total_time || 0,
           severity: data.severity,
           id: Date.now(),
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          full_content: mode === 'paste' ? pasteCode : null,
-          id_path: resolvedPath
+          full_content: resolvedMode === 'paste' ? pasteCode : null,
+          id_path: resolvedPath,
+          mode: resolvedMode
         }, ...prev].slice(0, 10))
+        await persistDebugSession(data, resolvedMode, resolvedPath, isCached)
       }
       setResult(data)
       if (data.pipeline_mode) {
@@ -1080,14 +1427,15 @@ function MainApp({ authUser, onLogout }) {
       if (error?.name === 'AbortError') {
         return
       }
-      setStatus(`Link error: ${error.message}`)
+      addToast(`Debug request failed: ${error.message}`, 'error')
+      setStatus(`Request failed: ${error.message}`)
     } finally {
       if (requestControllerRef.current === controller) {
         requestControllerRef.current = null
       }
       if (showLoader) setLoading(false)
     }
-  }, [activeTab, debugMode, filePath, mode, pasteCode])
+  }, [activeTab, debugMode, filePath, mode, pasteCode, persistDebugSession])
 
   useEffect(() => {
     if (activeTab === 'insights' && !insights && !insightsLoading) {
@@ -1105,9 +1453,9 @@ function MainApp({ authUser, onLogout }) {
       }
       event.preventDefault()
       if (mode === 'paste' && pasteCode.trim()) {
-        runDebug(null)
+        runDebug(null, true, 'paste')
       } else if (mode === 'upload' && filePath.trim()) {
-        runDebug(filePath)
+        runDebug(filePath, true, 'upload')
       }
     }
 
@@ -1134,14 +1482,18 @@ function MainApp({ authUser, onLogout }) {
     for (const item of batchSummary.items) {
       if (item.ok && item.result?.fixed_code && item.result?.success === false) {
         try {
-          await fetchJson(`${API}/apply_fix`, {
+          await fetchJson(`${API}/patch/apply`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ file_path: item.file_path, fixed_code: item.result.fixed_code })
+            body: JSON.stringify({
+              file_path: item.path || item.file_path,
+              fixed_code: item.result.fixed_code,
+              use_git: false
+            })
           });
           appliedCount++;
         } catch (error) {
-          console.error(`Failed to apply to ${item.file_path}:`, error);
+          console.error(`Failed to apply to ${item.path || item.file_path}:`, error);
         }
       }
     }
@@ -1173,7 +1525,7 @@ function MainApp({ authUser, onLogout }) {
       const firstAnomaly = (payload.items || []).find(item => item.ok && item.result && item.result.success === false)
       if (firstAnomaly?.result) {
         setResult(firstAnomaly.result)
-        setFilePath(firstAnomaly.result.source_path || firstAnomaly.file_path)
+        setFilePath(firstAnomaly.result.source_path || firstAnomaly.path || firstAnomaly.file_path)
         setActiveTab('debug')
       }
     } catch (error) {
@@ -1186,12 +1538,13 @@ function MainApp({ authUser, onLogout }) {
   const handleUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+    setMode('upload')
     setLoading(true)
     setResult(null)
     setDiff(null)
     setShowDiff(false)
     setFixValidation(null)
-    setStatus('Uploading...')
+    setStatus('Uploading file...')
 
     const formData = new FormData()
     formData.append('file', file)
@@ -1203,20 +1556,21 @@ function MainApp({ authUser, onLogout }) {
     requestControllerRef.current = controller
 
     try {
-      const data = await fetchJson(`${API}/upload?mode=${debugMode}`, {
+      const data = await fetchJson(`${API}/upload`, {
         method: 'POST',
         body: formData,
         signal: controller.signal
       })
-      setResult(data)
-      setFilePath(data.source_path || file.name)
-      setStatus(data.success ? 'Upload verified' : 'Anomalies found')
+      const uploadedPath = data.path
+      if (!uploadedPath) {
+        throw new Error('Upload completed without a file path.')
+      }
+      setFilePath(uploadedPath)
+      setStatus('Upload complete. Running debug...')
+      await runDebug(uploadedPath, false, 'upload')
       fetchWorkspace()
       fetchInsights(true)
       setActiveTab('debug')
-      if (data.pipeline_mode) {
-        setDebugMode(data.pipeline_mode)
-      }
     } catch (error) {
       if (error?.name === 'AbortError') {
         return
@@ -1265,22 +1619,35 @@ function MainApp({ authUser, onLogout }) {
       setStatus('Patch validation flagged risks. Resolve before commit.')
       return
     }
-    setStatus('Applying fix...')
+    const targetPath = result?.source_path || filePath
+    if (mode === 'paste' || !targetPath) {
+      setStatus('Patch apply is only available for workspace files. Copy the fix for snippets.')
+      return
+    }
+    setStatus('Applying patch...')
     try {
-      const targetPath = result?.source_path || filePath
-      const payload = await fetchJson(`${API}/apply_fix`, {
+      const payload = await fetchJson(`${API}/patch/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path: targetPath, fixed_code: result.fixed_code })
+        body: JSON.stringify({ file_path: targetPath, fixed_code: result.fixed_code, use_git: false })
       })
-      setStatus(payload?.message || 'Repair complete')
+      if (!payload.success) {
+        setStatus(payload?.message || 'Patch could not be applied')
+        return
+      }
+      setStatus(payload?.message || 'Patch applied successfully')
       fetchWorkspace()
       fetchInsights(true)
-      setTimeout(() => setStatus(''), 3000)
+      await runDebug(targetPath, false, 'upload')
     } catch (error) {
       setStatus(`Repair failed: ${error.message}`)
     }
   }
+
+  const openUploadPicker = useCallback(() => {
+    setMode('upload')
+    debugUploadInputRef.current?.click()
+  }, [])
 
   const handleCopy = async () => {
     if (!result?.fixed_code) return
@@ -1301,13 +1668,23 @@ function MainApp({ authUser, onLogout }) {
     }
 
     try {
-      const originalText = result?.source_code || pasteCode || ''
-      const data = await fetchJson(`${API}/diff`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ original: originalText, fixed: result.fixed_code })
-      })
-      setDiff(data.diff || '')
+      const targetPath = result?.source_path || filePath
+      if (mode !== 'paste' && targetPath) {
+        const data = await fetchJson(`${API}/patch/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_path: targetPath, fixed_code: result.fixed_code })
+        })
+        setDiff(data.patch || '')
+      } else {
+        const originalText = result?.source_code || pasteCode || ''
+        const data = await fetchJson(`${API}/diff`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ original: originalText, fixed: result.fixed_code })
+        })
+        setDiff(data.diff || '')
+      }
       setShowDiff(true)
     } catch (error) {
       setStatus(`Diff failed: ${error.message}`)
@@ -1315,7 +1692,7 @@ function MainApp({ authUser, onLogout }) {
   }
 
   const severityInfo = result?.severity ? SEVERITY_CONFIG[result.severity] : null
-  const successStatus = /stable|verified|copied|complete|cached: no errors|passed|ready/i.test(status)
+  const successStatus = result ? result.success : /no issues|copied|complete|passed|ready|applied|updated|uploaded/i.test(status)
   const filteredWorkspaceFiles = useMemo(() => {
     const query = workspaceQuery.trim().toLowerCase()
     if (!query) return workspaceFiles
@@ -1331,6 +1708,13 @@ function MainApp({ authUser, onLogout }) {
       file.name.toLowerCase().includes(query) || file.rel_path.toLowerCase().includes(query)
     )).slice(0, 10)
   }, [workspaceFiles, paletteQuery])
+  const runTargetLabel = getRunTargetLabel(result, mode, filePath)
+  const runStatusLabel = result ? (result.success ? 'No Issues Found' : 'Error Found') : ''
+  const runStatusTone = result?.success ? 'var(--success)' : 'var(--error)'
+  const runStatusBackground = result?.success ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)'
+  const executionTimeLabel = formatDuration(result?.total_time)
+  const failureHeadline = getFailureHeadline(result)
+  const failureReason = getFailureReason(result)
 
   return (
     <div className="app-layout">
@@ -1385,7 +1769,7 @@ function MainApp({ authUser, onLogout }) {
                         setFilePath(file.path);
                         setMode('upload');
                         setActiveTab('debug');
-                        runDebug(file.path);
+                        runDebug(file.path, true, 'upload');
                         setShowCommandPalette(false);
                       }}
                     >
@@ -1397,7 +1781,7 @@ function MainApp({ authUser, onLogout }) {
                   ))}
                   {filteredPaletteFiles.length === 0 && (
                     <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-                      No files found.
+                      No matching files found.
                     </div>
                   )}
                 </div>
@@ -1439,15 +1823,14 @@ function MainApp({ authUser, onLogout }) {
                 className="btn btn-secondary"
                 style={{ justifyContent: 'flex-start', fontSize: '0.8rem', padding: '0.75rem 1rem', width: '100%', border: '1px solid transparent' }}
                 onClick={() => {
-                  if (item.file !== '<snippet>') {
-                    setFilePath(item.id_path || item.file);
-                    setMode(item.file.startsWith('/') || item.file.includes('.') ? 'upload' : 'paste');
-                    if (item.file.startsWith('/') || item.file.includes('.')) {
-                      runDebug(item.id_path || item.file);
-                    } else {
-                      setPasteCode(item.full_content || '');
-                      runDebug(null);
-                    }
+                  const itemMode = item.mode || (item.id_path ? 'upload' : 'paste')
+                  setMode(itemMode)
+                  if (itemMode === 'upload') {
+                    setFilePath(item.id_path || item.file)
+                    runDebug(item.id_path || item.file, true, 'upload')
+                  } else {
+                    setPasteCode(item.full_content || '')
+                    runDebug(null, true, 'paste')
                   }
                 }}
               >
@@ -1500,19 +1883,20 @@ function MainApp({ authUser, onLogout }) {
       < main className="main-content" >
         <div className="main-scroll-area">
           <header>
-            <Motion.h1 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} style={{ fontSize: '2rem' }}>Offline AI-Powered Code Debugger - V2</Motion.h1>
+            <Motion.h1 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} style={{ fontSize: '2rem' }}>Offline AI-Powered Code Debugger</Motion.h1>
             <Motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-              using RAG and Multi-Agent Architecture for automation, validation, and security insights.
+              Debug Python locally, review AI-generated fixes, and collaborate on issues without leaving your workspace.
             </Motion.p>
           </header>
 
           <div className="tabs-container">
             <button className={`tab-btn ${activeTab === 'debug' ? 'active' : ''}`} onClick={() => setActiveTab('debug')}>Debug</button>
+            <button className={`tab-btn ${activeTab === 'collaboration' ? 'active' : ''}`} onClick={() => setActiveTab('collaboration')}>Collaboration</button>
             <button className={`tab-btn ${activeTab === 'workspace' ? 'active' : ''}`} onClick={() => setActiveTab('workspace')}>Workspace</button>
             <button className={`tab-btn ${activeTab === 'insights' ? 'active' : ''}`} onClick={() => setActiveTab('insights')}>Insights</button>
             <button className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security</button>
             <button className={`tab-btn ${activeTab === 'metrics' ? 'active' : ''}`} onClick={() => setActiveTab('metrics')}>Metrics</button>
-            <button className={`tab-btn ${activeTab === 'terminal' ? 'active' : ''}`} onClick={() => setActiveTab('terminal')}>Execution Log</button>
+            <button className={`tab-btn ${activeTab === 'terminal' ? 'active' : ''}`} onClick={() => setActiveTab('terminal')}>Execution Trace</button>
           </div>
 
           <div className="grid" style={{ gridTemplateColumns: '1fr 320px', alignItems: 'start' }}>
@@ -1520,19 +1904,25 @@ function MainApp({ authUser, onLogout }) {
               <AnimatePresence mode="wait">
                 {activeTab === 'debug' && (
                   <Motion.div key="debug-tab" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                    <input ref={debugUploadInputRef} type="file" hidden onChange={handleUpload} accept=".py" />
+
+
+
+
+
                     <div className="card">
                       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
                         <button className={`btn ${mode === 'paste' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('paste')}>
-                          <Clipboard size={18} /> Paste Fragment
+                          <Clipboard size={18} /> Paste Code
                         </button>
                         <button className={`btn ${mode === 'upload' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('upload')}>
-                          <Upload size={18} /> Load File
+                          <Upload size={18} /> Upload File
                         </button>
                       </div>
 
                       <div className="mode-toolbar">
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
-                          Pipeline Mode
+                          Debug Mode
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button className={`mode-chip ${debugMode === 'fast' ? 'active' : ''}`} onClick={() => setDebugMode('fast')} type="button">
@@ -1558,7 +1948,7 @@ function MainApp({ authUser, onLogout }) {
                             className="input-field"
                             value={pasteCode}
                             onChange={e => setPasteCode(e.target.value)}
-                            placeholder="# Enter buggy Python logic..."
+                            placeholder="# Paste Python code here to debug it with AI guidance."
                             style={{ minHeight: '280px', border: preflightError ? '1px solid var(--error)' : '1px solid var(--border)' }}
                           />
                           {preflightError && (
@@ -1567,8 +1957,8 @@ function MainApp({ authUser, onLogout }) {
                             </Motion.div>
                           )}
                           <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDebug(null)} disabled={loading || !pasteCode.trim()}>
-                            {loading ? <div className="loader" /> : <Zap size={20} />}
-                            {loading ? LOADING_MESSAGES[loadingStep] : 'Run Debug Pipeline'}
+                            {loading ? <RefreshCcw size={18} className="spin" /> : <Zap size={20} />}
+                            {loading ? LOADING_MESSAGES[loadingStep] : 'Run Debug'}
                           </button>
                         </div>
                       ) : (
@@ -1590,11 +1980,11 @@ function MainApp({ authUser, onLogout }) {
                           }}
                         >
                           <Upload size={48} color="var(--text-tertiary)" style={{ marginBottom: '1.5rem' }} />
-                          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Drop Python target into Quantum Field or</p>
-                          <label className="btn btn-secondary" style={{ display: 'inline-flex' }}>
-                            Initialize Uplink
-                            <input type="file" hidden onChange={handleUpload} accept=".py" />
-                          </label>
+                          <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Drop a Python file into the upload area or choose one from your computer.</p>
+                          <p style={{ color: 'var(--text-tertiary)', marginBottom: '1.5rem', fontSize: '0.8rem' }}>Supported format: `.py`</p>
+                          <button className="btn btn-secondary" type="button" onClick={openUploadPicker}>
+                            Choose Python File
+                          </button>
                         </div>
                       )}
 
@@ -1619,42 +2009,134 @@ function MainApp({ authUser, onLogout }) {
                         >
                           {successStatus ? <CheckCircle2 size={14} /> : <Info size={14} />}
                           {status}
-                          {result && !result.success && <span style={{ fontSize: '0.7rem', opacity: 0.6, marginLeft: '0.5rem' }}>(CLICK TO JUMP)</span>}
+                          {result && !result.success && <span style={{ fontSize: '0.7rem', opacity: 0.6, marginLeft: '0.5rem' }}>(Jump to details)</span>}
                         </Motion.div>
                       )}
                     </div>
+
+                    {result && (
+                      <div
+                        className="card glass"
+                        style={{
+                          marginTop: '1rem',
+                          borderLeft: `4px solid ${runStatusTone}`,
+                          background: runStatusBackground
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800, marginBottom: '0.45rem' }}>
+                              Latest Run
+                            </div>
+                            <h3 style={{ marginBottom: '0.35rem' }}>{runTargetLabel}</h3>
+                            <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+                              {result.success
+                                ? 'Execution completed without runtime issues.'
+                                : 'A runtime error was found. Review the explanation and suggested fix below.'}
+                            </p>
+                          </div>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.5rem 0.8rem', borderRadius: '999px', background: 'rgba(0,0,0,0.18)', color: runStatusTone, fontWeight: 800, fontSize: '0.78rem' }}>
+                            {result.success ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                            {runStatusLabel}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
+                          <div style={{ padding: '0.9rem', borderRadius: '0.9rem', background: 'rgba(255,255,255,0.04)' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>File</div>
+                            <div style={{ marginTop: '0.35rem', fontWeight: 700 }}>{runTargetLabel}</div>
+                          </div>
+                          <div style={{ padding: '0.9rem', borderRadius: '0.9rem', background: 'rgba(255,255,255,0.04)' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Status</div>
+                            <div style={{ marginTop: '0.35rem', fontWeight: 700, color: runStatusTone }}>{runStatusLabel}</div>
+                          </div>
+                          <div style={{ padding: '0.9rem', borderRadius: '0.9rem', background: 'rgba(255,255,255,0.04)' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Execution Time</div>
+                            <div style={{ marginTop: '0.35rem', fontWeight: 700 }}>{executionTimeLabel}</div>
+                          </div>
+                          <div style={{ padding: '0.9rem', borderRadius: '0.9rem', background: 'rgba(255,255,255,0.04)' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>Exit Code</div>
+                            <div style={{ marginTop: '0.35rem', fontWeight: 700 }}>{result.exit_code ?? 'N/A'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {result && result.success && (
+                      <div className="card glass" style={{ marginTop: '1rem' }}>
+                        <h3 style={{ marginBottom: '0.4rem', color: 'var(--success)' }}>No issues found in the latest run</h3>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                          Use Execution Trace to show runtime output, or open Security Audit to review static analysis for this file.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          <button className="btn btn-secondary btn-sm" type="button" onClick={() => setActiveTab('terminal')}>
+                            <Terminal size={14} /> View Execution Trace
+                          </button>
+                          <button className="btn btn-secondary btn-sm" type="button" onClick={() => setActiveTab('security')}>
+                            <Shield size={14} /> View Security Audit
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {result && !result.success && (
                       <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                         <div className="card" ref={traceRef}>
                           <h3 style={{ color: 'var(--error)', display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.2rem', marginBottom: '1.5rem' }}>
-                            <Terminal size={20} /> Traceback Intercepted
+                            <Terminal size={20} /> Runtime Error
                           </h3>
                           {severityInfo && (
                             <div style={{ marginBottom: '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.35rem 0.65rem', borderRadius: '999px', background: severityInfo.bg, color: severityInfo.color, fontSize: '0.72rem', fontWeight: 700 }}>
                               {severityInfo.icon} {severityInfo.label}
                             </div>
                           )}
-                          <div style={{ borderRadius: '1rem', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)' }}>
-                            <SyntaxHighlighter language="text" style={vscDarkPlus} showLineNumbers={true} customStyle={{ margin: 0, padding: '1.5rem', fontSize: '0.85rem', background: 'transparent' }}>
-                              {result.error}
-                            </SyntaxHighlighter>
-                          </div>
-                          {result.analysis && (
-                            <div style={{ marginTop: '2rem' }}>
-                              <h4 style={{ marginBottom: '1rem', fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase' }}>VIPER AGENT ADVISORY</h4>
-                              <div style={{ padding: '1.25rem', background: 'rgba(168, 85, 247, 0.05)', borderRadius: '1rem', border: '1px solid rgba(168, 85, 247, 0.1)', lineHeight: 1.8, fontSize: '0.9rem' }}>
-                                {result.analysis}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                            <div style={{ padding: '1rem', borderRadius: '1rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: '0.5rem' }}>
+                                What Failed
+                              </div>
+                              <div style={{ fontWeight: 700, lineHeight: 1.5 }}>{failureHeadline}</div>
+                            </div>
+                            <div style={{ padding: '1rem', borderRadius: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: '0.5rem' }}>
+                                Why It Failed
+                              </div>
+                              <div style={{ lineHeight: 1.65, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{failureReason}</div>
+                            </div>
+                            <div style={{ padding: '1rem', borderRadius: '1rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, marginBottom: '0.5rem' }}>
+                                Suggested Fix
+                              </div>
+                              <div style={{ lineHeight: 1.65, color: 'var(--text-secondary)' }}>
+                                {result.fixed_code
+                                  ? 'An editable AI-generated fix is ready below. Validate it, review the diff, and apply it when you are satisfied.'
+                                  : 'No automatic fix was generated for this run. Use the trace details and AI analysis to resolve the issue manually.'}
                               </div>
                             </div>
-                          )}
+                          </div>
+
+                          <details style={{ border: '1px solid var(--border)', borderRadius: '1rem', overflow: 'hidden', background: 'rgba(0,0,0,0.2)' }}>
+                            <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '1rem 1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              View Full Traceback
+                            </summary>
+                            <div style={{ borderTop: '1px solid var(--border)' }}>
+                              <SyntaxHighlighter language="text" style={vscDarkPlus} showLineNumbers={true} customStyle={{ margin: 0, padding: '1.5rem', fontSize: '0.85rem', background: 'transparent' }}>
+                                {result.error}
+                              </SyntaxHighlighter>
+                            </div>
+                          </details>
                         </div>
 
-                        <div className="card" style={{ borderTop: '4px solid var(--success)', padding: '0' }}>
+                        <div className="card" ref={fixPanelRef} style={{ borderTop: '4px solid var(--success)', padding: '0' }}>
                           <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                              <h3 style={{ color: 'var(--success)', fontSize: '1.2rem', marginBottom: '0.2rem' }}>Patch Workspace</h3>
-                              <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>Review, validate, and apply generated patch changes</p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+                                <h3 style={{ color: 'var(--success)', fontSize: '1.2rem', margin: 0 }}>Suggested Fix</h3>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.3rem 0.6rem', borderRadius: '999px', background: 'rgba(16, 185, 129, 0.12)', color: 'var(--success)', fontSize: '0.7rem', fontWeight: 800 }}>
+                                  <CheckCircle2 size={12} /> AI Suggested Fix
+                                </span>
+                              </div>
+                              <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>Review, validate, and apply the generated fix.</p>
                             </div>
                             <div style={{ display: 'flex', gap: '0.75rem' }}>
                               <button className="btn btn-secondary btn-sm" onClick={handleShowDiff} disabled={!result?.fixed_code}>
@@ -1664,14 +2146,14 @@ function MainApp({ authUser, onLogout }) {
                                 <Clipboard size={14} /> Copy
                               </button>
                               <button className="btn btn-secondary btn-sm" onClick={handleValidatePatch} disabled={!result?.fixed_code || validatingFix}>
-                                <ListChecks size={14} /> {validatingFix ? 'Validating...' : 'Validate Patch'}
+                                <ListChecks size={14} /> {validatingFix ? 'Validating...' : 'Validate Fix'}
                               </button>
                               <button
                                 className="btn btn-primary btn-sm"
                                 onClick={handleApplyFix}
                                 disabled={!result?.fixed_code || validatingFix || (fixValidation && !fixValidation.ready_to_apply)}
                               >
-                                <Zap size={14} /> Commit Patch
+                                <Zap size={14} /> Apply Fix
                               </button>
                             </div>
                           </div>
@@ -1709,8 +2191,30 @@ function MainApp({ authUser, onLogout }) {
                   </Motion.div>
                 )}
 
+                {activeTab === 'collaboration' && (
+                  <Motion.div key="collaboration-tab" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                    <TabHeader tabKey="collaboration" />
+                    {activeSession ? (
+                      <div className="grid" style={{ gridTemplateColumns: '1fr', gap: '2rem' }}>
+                        <div>
+                          <button className="btn btn-secondary btn-sm" onClick={() => setActiveSession(null)} style={{ marginBottom: '1rem' }}>
+                            &larr; Back to Sessions
+                          </button>
+                          <SessionCollaboration session={activeSession} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem', alignItems: 'start' }}>
+                        <SharedSessionList onSelectSession={setActiveSession} onOpenDebug={() => setActiveTab('debug')} />
+                        <CollaborationTab />
+                      </div>
+                    )}
+                  </Motion.div>
+                )}
+
                 {activeTab === 'workspace' && (
                   <Motion.div key="workspace-tab" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                    <TabHeader tabKey="workspace" />
                     <div className="card glass" style={{ marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                       <input
                         className="input-field"
@@ -1746,7 +2250,7 @@ function MainApp({ authUser, onLogout }) {
                       onBatchDebug={handleBatchDebug}
                       onClearSelection={clearWorkspaceSelection}
                       batchLoading={batchLoading}
-                      onSelectFile={(path) => { setFilePath(path); setMode('upload'); runDebug(path); }}
+                      onSelectFile={(path) => { setFilePath(path); setMode('upload'); runDebug(path, true, 'upload'); }}
                       workspaceRoot={workspaceRoot}
                       onUpdateRoot={handleUpdateWorkspaceRoot}
                       onPickProject={handlePickWorkspaceProject}
@@ -1758,6 +2262,7 @@ function MainApp({ authUser, onLogout }) {
 
                 {activeTab === 'insights' && (
                   <Motion.div key="insights-tab" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                    <TabHeader tabKey="insights" />
                     <InsightsPanel
                       insights={insights}
                       loading={insightsLoading}
@@ -1769,23 +2274,14 @@ function MainApp({ authUser, onLogout }) {
 
                 {activeTab === 'security' && (
                   <Motion.div key="security-tab" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                    <div className="card">
-                      <h3>Security Audit</h3>
-                      <p style={{ color: 'var(--text-tertiary)', marginBottom: '2rem' }}>Static security findings from heuristics and Bandit (when available).</p>
-                      {result ? (
-                        <SecurityPanel data={result.security_audit} />
-                      ) : (
-                        <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-tertiary)' }}>
-                          <Shield size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                          <p>Initialize a debug session to view security audit data.</p>
-                        </div>
-                      )}
-                    </div>
+                    <TabHeader tabKey="security" />
+                    <SecurityPanel data={result?.security_audit} onOpenDebug={() => setActiveTab('debug')} />
                   </Motion.div>
                 )}
 
                 {activeTab === 'metrics' && (
                   <Motion.div key="metrics-tab" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                    <TabHeader tabKey="metrics" />
                     <MetricsPanel
                       metrics={metrics}
                       loading={metricsLoading}
@@ -1797,7 +2293,10 @@ function MainApp({ authUser, onLogout }) {
 
                 {activeTab === 'terminal' && (
                   <Motion.div key="terminal-tab" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                    <TerminalPanel result={result} loading={loading} />
+                    <TabHeader tabKey="terminal" />
+                    <div className="card">
+                      <TerminalPanel result={result} loading={loading} />
+                    </div>
                   </Motion.div>
                 )}
               </AnimatePresence>
@@ -1808,19 +2307,21 @@ function MainApp({ authUser, onLogout }) {
               <div className="card glass" style={{ padding: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
                   <Zap size={18} color="var(--accent)" />
-                  <span style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Kernel Metrics</span>
+                  <span style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Run Summary</span>
                 </div>
-                <StatCard label="Pipeline State" value={health.model_loaded ? 'Optimal' : 'Cold Start'} icon={Shield} color={health.model_loaded ? 'var(--success)' : 'var(--warning)'} />
-                <StatCard label="Active Mode" value={debugMode === 'fast' ? 'Fast' : 'Full'} icon={Zap} color={debugMode === 'fast' ? 'var(--warning)' : 'var(--accent)'} />
+                <StatCard label="Model Status" value={health.model_loaded ? 'Ready' : 'Disabled'} icon={Shield} color={health.model_loaded ? 'var(--success)' : 'var(--warning)'} />
+                <StatCard label="Debug Mode" value={debugMode === 'fast' ? 'Fast' : 'Full'} icon={Zap} color={debugMode === 'fast' ? 'var(--warning)' : 'var(--accent)'} />
                 {insights && <StatCard label="Workspace Files" value={insights.total_files} icon={Layout} color="var(--accent-secondary)" />}
-                {result && result.total_time && <StatCard label="Latent Response" value={`${result.total_time}s`} icon={Activity} color="var(--accent)" />}
+                {result && result.total_time && <StatCard label="Response Time" value={formatDuration(result.total_time)} icon={Activity} color="var(--accent)" />}
               </div>
-              <ComplexityPanel data={result?.complexity} />
-              <ViperAnalytics result={result} />
+              <ComplexityPanel data={result?.complexity} onOpenDebug={() => setActiveTab('debug')} />
+              <ViperAnalytics result={result} onOpenDebug={() => setActiveTab('debug')} />
             </div>
           </div>
         </div>
       </main >
+
+      {/* Toasts are handled globally in App to avoid unmount issues */}
     </div >
   )
 }

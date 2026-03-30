@@ -22,6 +22,11 @@ class RegisterRequest(StrictModel):
     display_name: str = Field(default="", max_length=100)
 
 
+class UserProfile(BaseModel):
+    username: str
+    display_name: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -66,6 +71,7 @@ class BatchDebugRequest(StrictModel):
 
 class DebugResponse(BaseModel):
     error: Optional[str] = None
+    details: Optional[str] = None
     analysis: Optional[str] = None
     explanation: Optional[str] = None
     verification: Optional[str] = None
@@ -80,4 +86,53 @@ class DebugResponse(BaseModel):
     source_path: Optional[str] = None
     source_code: Optional[str] = None
     pipeline_mode: Optional[str] = None
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+    exit_code: Optional[int] = None
+    timed_out: Optional[bool] = None
+    error_line: Optional[int] = None
+    error_type: Optional[str] = None
+    execution_backend: Optional[str] = None
+    beginner_explanation: Optional[str] = None
+    learning_tips: Optional[list[str]] = None
+    error_concept: Optional[str] = None
     success: bool
+
+
+# ── Patch System Schemas ───────────────────────────────────────────────────
+
+class GeneratePatchRequest(StrictModel):
+    file_path: str = Field(min_length=1, max_length=4096)
+    fixed_code: str = Field(min_length=1, max_length=MAX_SNIPPET_CHARS)
+
+
+class GeneratePatchResponse(BaseModel):
+    patch: str
+    file_path: str
+    original_lines: int
+    fixed_lines: int
+    additions: int
+    deletions: int
+
+
+class ApplyPatchRequest(StrictModel):
+    file_path: str = Field(min_length=1, max_length=4096)
+    fixed_code: str = Field(min_length=1, max_length=MAX_SNIPPET_CHARS)
+    patch_content: Optional[str] = None
+    use_git: bool = True
+
+
+class ApplyPatchResponse(BaseModel):
+    success: bool
+    method: str
+    file_path: str
+    message: str
+    branch_name: Optional[str] = None
+    commit_sha: Optional[str] = None
+    conflict: Optional[str] = None
+    stash_restored: bool = False
+
+
+class PatchPreviewRequest(StrictModel):
+    file_path: str = Field(min_length=1, max_length=4096)
+    fixed_code: str = Field(min_length=1, max_length=MAX_SNIPPET_CHARS)

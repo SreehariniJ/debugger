@@ -67,12 +67,12 @@ def start_services() -> None:
     backend_port = _find_available_port(preferred_backend_port)
     frontend_seed = preferred_frontend_port if preferred_frontend_port != backend_port else preferred_frontend_port + 1
     frontend_port = _find_available_port(frontend_seed)
-    backend_health_url = f"http://127.0.0.1:{backend_port}/health"
+    backend_health_url = f"http://127.0.0.1:{backend_port}/"
     backend_api_url = f"http://127.0.0.1:{backend_port}"
     frontend_url = f"http://127.0.0.1:{frontend_port}"
 
     backend_proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", str(backend_port)],
+        [sys.executable, "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", str(backend_port)],
         cwd=str(PROJECT_ROOT),
     )
 

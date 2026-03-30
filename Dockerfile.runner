@@ -1,0 +1,36 @@
+# =============================================================================
+# Dockerfile.runner — Hardened Sandbox Image for Untrusted Code Execution
+# =============================================================================
+# This image is purpose-built for executing user-submitted Python code in
+# complete isolation. It contains NO development tools, NO package managers
+# beyond the base, and runs as a locked-down non-root user.
+#
+# Build:   docker build -t python-runner:latest -f Dockerfile.runner .
+# =============================================================================
+
+FROM python:3.11-slim AS runner
+
+# ── System hardening ────────────────────────────────────────────────────────
+# 1. Remove apt cache and unnecessary system utilities that could be weaponized
+# 2. Create a dedicated non-root user with no login shell
+# 3. Strip setuid/setgid bits from ALL binaries to prevent privilege escalation
+RUN apt-get purge -y --auto-remove \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && useradd --no-log-init --create-home --shell /usr/sbin/nologin sandboxuser \
+    && find / -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null || true
+
+# ── Workspace setup ────────────────────────────────────────────────────────
+# The /sandbox directory is where user code will be bind-mounted (read-only).
+# /sandbox/output is writable so the executed script can produce output files
+# if needed, but it is ephemeral (destroyed with the container).
+WORKDIR /sandbox
+RUN mkdir -p /sandbox/output \
+    && chown -R sandboxuser:sandboxuser /sandbox
+
+# ── Drop to unprivileged user ──────────────────────────────────────────────
+USER sandboxuser
+
+# ── Execution defaults ─────────────────────────────────────────────────────
+# -u : unbuffered stdout/stderr so we capture output immediately
+# -B : don't write .pyc files (read-only filesystem)
+ENTRYPOINT ["python", "-u", "-B"]

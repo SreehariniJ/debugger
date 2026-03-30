@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "C:\Users\Sreeharini\offline_debugger\test_run.py", line 4, in <module>
+    import main
+  File "C:\Users\Sreeharini\offline_debugger\main.py", line 16, in <module>
+    from backend.routers import (
+    ...<2 lines>...
+    )
+  File "C:\Users\Sreeharini\offline_debugger\backend\routers\__init__.py", line 1, in <module>
+    from . import auth, debug, system, workspace, runtime, profiling, visualization, sessions, teams, comments
+  File "C:\Users\Sreeharini\offline_debugger\backend\routers\auth.py", line 8, in <module>
+    from backend.dependencies import get_current_user
+  File "C:\Users\Sreeharini\offline_debugger\backend\dependencies.py", line 15, in <module>
+    from Scanner import CodeScanner
+ModuleNotFoundError: No module named 'Scanner'

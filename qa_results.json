@@ -1,0 +1,361 @@
+{
+  "summary": {
+    "passed": 35,
+    "failed": 4,
+    "total": 39,
+    "duration_seconds": 181.73
+  },
+  "results": [
+    {
+      "test": "Health Endpoint",
+      "category": "System",
+      "action": "GET /health",
+      "expected": "200 + status=ok",
+      "actual": "200 + status=online",
+      "status": "FAIL",
+      "notes": ""
+    },
+    {
+      "test": "Auth Login Valid",
+      "category": "Authentication",
+      "action": "POST /auth/login with valid creds",
+      "expected": "200 + access_token present",
+      "actual": "200 + token=present",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Auth Login Invalid",
+      "category": "Authentication",
+      "action": "POST /auth/login with bad creds",
+      "expected": "401 Unauthorized",
+      "actual": "401",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Auth Register Duplicate",
+      "category": "Authentication",
+      "action": "POST /auth/register for existing user",
+      "expected": "409 Conflict",
+      "actual": "409",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Auth Profile",
+      "category": "Authentication",
+      "action": "GET /auth/me",
+      "expected": "200 + username",
+      "actual": "200 + username=testuser_qa",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Fast Debug - HTTP Status",
+      "category": "Debug Pipeline",
+      "action": "POST /debug_snippet (fast mode, SyntaxError)",
+      "expected": "200",
+      "actual": "200",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Fast Debug - Error Detection",
+      "category": "Debug Pipeline",
+      "action": "Check error_type in response",
+      "expected": "SyntaxError",
+      "actual": "SyntaxError",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Fast Debug - Fix Generated",
+      "category": "Debug Pipeline",
+      "action": "Check fixed_code present",
+      "expected": "Non-empty fixed_code",
+      "actual": "present (20 chars)",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Fast Debug - Pipeline Mode",
+      "category": "Debug Pipeline",
+      "action": "Check pipeline_mode=fast",
+      "expected": "fast",
+      "actual": "fast",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Fast Debug - Sandbox Verification",
+      "category": "Debug Pipeline",
+      "action": "Check sandbox verification ran",
+      "expected": "Sandbox verification present",
+      "actual": "Model-generated fix verified in sandbox.",
+      "status": "PASS",
+      "notes": "Sandbox passed: True"
+    },
+    {
+      "test": "Fast Debug - Response Time",
+      "category": "Performance",
+      "action": "Total time for fast mode",
+      "expected": "<60s",
+      "actual": "37.4s (API total_time: 37.365s)",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - HTTP Status",
+      "category": "Debug Pipeline",
+      "action": "POST /debug_snippet (full, chained error)",
+      "expected": "200",
+      "actual": "200",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Error Type",
+      "category": "Debug Pipeline",
+      "action": "Check error_type for TypeError",
+      "expected": "TypeError",
+      "actual": "TypeError",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Chained Trace",
+      "category": "Debug Pipeline",
+      "action": "stderr contains ZeroDivisionError chain",
+      "expected": "ZeroDivisionError in stderr",
+      "actual": "found",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Analysis",
+      "category": "Debug Pipeline",
+      "action": "Check analysis text present",
+      "expected": "Non-empty analysis",
+      "actual": "present (149 chars)",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Fix Code",
+      "category": "Debug Pipeline",
+      "action": "Check fixed_code generated",
+      "expected": "Non-empty fixed_code",
+      "actual": "present",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Severity",
+      "category": "Debug Pipeline",
+      "action": "Check severity set",
+      "expected": "Non-empty severity",
+      "actual": "CRITICAL",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Confidence",
+      "category": "Debug Pipeline",
+      "action": "Check confidence score",
+      "expected": "1-10 range",
+      "actual": "10",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Complexity",
+      "category": "Debug Pipeline",
+      "action": "Check complexity analysis",
+      "expected": "Complexity object present",
+      "actual": "present",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Security Audit",
+      "category": "Debug Pipeline",
+      "action": "Check security audit in full mode",
+      "expected": "Security audit object present",
+      "actual": "present",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Metrics",
+      "category": "Debug Pipeline",
+      "action": "Check timing metrics present",
+      "expected": "metrics object with scan_rag, viper_orchestration",
+      "actual": "keys=['scan_rag', 'viper_orchestration', 'final_synthesis', 'execution', 'fast_mode', 'cache_status']",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Full Chained - Response Time",
+      "category": "Performance",
+      "action": "Total time for full mode",
+      "expected": "<120s",
+      "actual": "51.6s",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Empty Input",
+      "category": "Edge Cases",
+      "action": "POST /debug_snippet with empty code",
+      "expected": "Graceful handling (400 or success=true)",
+      "actual": "422",
+      "status": "PASS",
+      "notes": "Response: {'detail': [{'type': 'string_too_short', 'loc': ['body', 'code'], 'msg': 'String should have at least 1 character', 'input': '', 'ctx': {'min_length': 1}}]}"
+    },
+    {
+      "test": "Large Snippet - HTTP Status",
+      "category": "Edge Cases",
+      "action": "POST /debug_snippet with 500-line file",
+      "expected": "200",
+      "actual": "200",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Large Snippet - Error Detected",
+      "category": "Edge Cases",
+      "action": "Check error detection in large file",
+      "expected": "NameError detected",
+      "actual": "NameError",
+      "status": "PASS",
+      "notes": "Time: 0.5s"
+    },
+    {
+      "test": "No-Op Rejection",
+      "category": "Validate Fix",
+      "action": "POST /validate_fix with comment-only change",
+      "expected": "ready_to_apply=false",
+      "actual": "ready_to_apply=False",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "No-Op Quality Score",
+      "category": "Validate Fix",
+      "action": "Check quality_score is low",
+      "expected": "Low score (<=50)",
+      "actual": "quality_score=10",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Real Fix Accepted",
+      "category": "Validate Fix",
+      "action": "POST /validate_fix with meaningful fix",
+      "expected": "ready_to_apply=true",
+      "actual": "ready_to_apply=True",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Real Fix Quality Score",
+      "category": "Validate Fix",
+      "action": "Check quality_score is high",
+      "expected": "High score (>=50)",
+      "actual": "quality_score=95",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Empty Fix Rejection",
+      "category": "Validate Fix",
+      "action": "POST /validate_fix with empty fixed code",
+      "expected": "400 or ready_to_apply=false",
+      "actual": "code=422",
+      "status": "FAIL",
+      "notes": ""
+    },
+    {
+      "test": "Syntax Error Fix",
+      "category": "Validate Fix",
+      "action": "POST /validate_fix with syntax-broken fix",
+      "expected": "ready_to_apply=false, syntax error reported",
+      "actual": "ready=False, syntax={'fixed_valid': False, 'error': 'invalid syntax (<unknown>, line 1)'}",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Complexity Endpoint",
+      "category": "Analytics",
+      "action": "POST /analyze_complexity",
+      "expected": "200 + complexity_score present",
+      "actual": "200 + score=4",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Diff Endpoint",
+      "category": "Utilities",
+      "action": "POST /diff",
+      "expected": "200 + diff text present",
+      "actual": "200 + diff=present",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Workspace Files",
+      "category": "Workspace",
+      "action": "GET /workspace/files",
+      "expected": "200 + list of files",
+      "actual": "0 + not-list files",
+      "status": "FAIL",
+      "notes": ""
+    },
+    {
+      "test": "Workspace Insights",
+      "category": "Workspace",
+      "action": "GET /workspace_insights",
+      "expected": "200 + insights object",
+      "actual": "200 + total_files=1",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "System Info",
+      "category": "System",
+      "action": "GET /system/info",
+      "expected": "200 + version present",
+      "actual": "0 + version=?",
+      "status": "FAIL",
+      "notes": ""
+    },
+    {
+      "test": "Rate Limit - Normal Load",
+      "category": "Security",
+      "action": "5 rapid POST /analyze_complexity",
+      "expected": "All 200 (under limit)",
+      "actual": "codes=[200, 200, 200, 200, 200]",
+      "status": "PASS",
+      "notes": ""
+    },
+    {
+      "test": "Model Failure Handling",
+      "category": "Resilience",
+      "action": "POST /debug_snippet with complex code",
+      "expected": "200 (success=false with error or fix)",
+      "actual": "200 + success=False",
+      "status": "PASS",
+      "notes": "error_type=AttributeError, has_fix=True"
+    },
+    {
+      "test": "No-Error Code",
+      "category": "Debug Pipeline",
+      "action": "POST /debug_snippet with valid code",
+      "expected": "200 + success=true",
+      "actual": "200 + success=True",
+      "status": "PASS",
+      "notes": ""
+    }
+  ]
+}

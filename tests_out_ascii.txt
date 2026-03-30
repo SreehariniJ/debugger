@@ -1,0 +1,45 @@
+...FF...............                                                     [100%]
+================================== FAILURES ===================================
+____________________ test_debug_snippet_fast_mode_flagged _____________________
+
+    def test_debug_snippet_fast_mode_flagged() -> None:
+        response = client.post(
+            "/debug_snippet",
+            json={"code": "num=1\ndenom=0\nprint(num/denom)\n", "mode": "fast"},
+        )
+>       assert response.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = <Response [500 Internal Server Error]>.status_code
+
+tests\test_api_endpoints.py:100: AssertionError
+__________________ test_debug_batch_processes_multiple_files __________________
+
+    def test_debug_batch_processes_multiple_files() -> None:
+        workspace = Path(app.WORKSPACE_ROOT)
+        clean_file = workspace / "_pytest_batch_clean.py"
+        buggy_file = workspace / "_pytest_batch_bug.py"
+    
+        clean_file.write_text("print('ok')\n", encoding="utf-8")
+        buggy_file.write_text("num = 1\ndenom = 0\nprint(num / denom)\n", encoding="utf-8")
+        try:
+            response = client.post(
+                "/debug_batch",
+                json={
+                    "file_paths": [str(clean_file), str(buggy_file)],
+                    "mode": "fast",
+                    "max_concurrency": 2,
+                },
+            )
+            assert response.status_code == 200
+            payload = response.json()
+            assert payload["requested"] == 2
+            assert payload["processed"] == 2
+            assert len(payload["items"]) == 2
+>           assert payload["succeeded"] >= 1
+E           assert 0 >= 1
+
+tests\test_api_endpoints.py:127: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_api_endpoints.py::test_debug_snippet_fast_mode_flagged - as...
+FAILED tests/test_api_endpoints.py::test_debug_batch_processes_multiple_files
+2 failed, 18 passed in 4.31s

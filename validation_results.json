@@ -1,0 +1,181 @@
+{
+  "chained_exceptions": {
+    "error": "Traceback (most recent call last):\n  File \"C:\\Users\\Sreeharini\\offline_debugger\\uploads\\_snippet_ij4aasjt.py\", line 3, in failing_code\n    1 / 0\n    ~~^~~\nZeroDivisionError: division by zero\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\Sreeharini\\offline_debugger\\uploads\\_snippet_ij4aasjt.py\", line 7, in <module>\n    failing_code()\n    ~~~~~~~~~~~~^^\n  File \"C:\\Users\\Sreeharini\\offline_debugger\\uploads\\_snippet_ij4aasjt.py\", line 5, in failing_code\n    \"a\" + 1\n    ~~~~^~~\nTypeError: can only concatenate str (not \"int\") to str",
+    "details": null,
+    "analysis": "The root cause of the error is a type mismatch in the code. The variable `\"a\"` is being concatenated to an integer `1`, which results in a TypeError.",
+    "explanation": "In Python, you cannot concatenate strings and integers directly. You need to convert one or both operands to the same data type before performing the concatenation. In this case, we can convert the string `\"a\"` to an integer using the `int()` function.\n\nREMEDiation Summary:\nTo fix this issue, modify the code as follows:\n\n```python\ndef failing_code():\n    try:\n        1 / 0\n    except ZeroDivisionError:\n        \"a\" + int(1)\n\nfailing_code()\n```",
+    "verification": "Orchestrated fix successful on attempt 1 Sandbox verification passed.",
+    "fixed_code": "def failing_code():\n    try:\n        1 / 0\n    except ZeroDivisionError:\n        print(\"a\" + str(1))\n\nfailing_code()",
+    "severity": "CRITICAL",
+    "confidence": 10,
+    "complexity": {
+      "functions": 1,
+      "classes": 0,
+      "loops": 0,
+      "conditions": 0,
+      "complexity_score": 1,
+      "grade": "A",
+      "loc": 6,
+      "comments": 0,
+      "top_complex": "failing_code",
+      "mi_score": 74.75,
+      "mi_grade": "A"
+    },
+    "security_audit": {
+      "count": 0,
+      "issues": [],
+      "is_secure": true,
+      "audit_timestamp": 1774864179.230917,
+      "engine": "Bandit + Custom Heuristics"
+    },
+    "topology": null,
+    "metrics": {
+      "scan_rag": 0.853,
+      "viper_orchestration": 42.368,
+      "final_synthesis": 0.0,
+      "execution": 0.194,
+      "fast_mode": 0.0,
+      "cache_status": 0.0
+    },
+    "total_time": 43.785,
+    "source_path": null,
+    "source_code": "def failing_code():\n    try:\n        1 / 0\n    except ZeroDivisionError:\n        \"a\" + 1\n\nfailing_code()\n",
+    "pipeline_mode": "full",
+    "stdout": "",
+    "stderr": "Traceback (most recent call last):\n  File \"C:\\Users\\Sreeharini\\offline_debugger\\uploads\\_snippet_ij4aasjt.py\", line 3, in failing_code\n    1 / 0\n    ~~^~~\nZeroDivisionError: division by zero\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"C:\\Users\\Sreeharini\\offline_debugger\\uploads\\_snippet_ij4aasjt.py\", line 7, in <module>\n    failing_code()\n    ~~~~~~~~~~~~^^\n  File \"C:\\Users\\Sreeharini\\offline_debugger\\uploads\\_snippet_ij4aasjt.py\", line 5, in failing_code\n    \"a\" + 1\n    ~~~~^~~\nTypeError: can only concatenate str (not \"int\") to str\n",
+    "exit_code": 1,
+    "timed_out": false,
+    "error_line": 5,
+    "error_type": "TypeError",
+    "execution_backend": "local_fallback",
+    "beginner_explanation": "In Python, you cannot concatenate strings and integers directly. You need to convert one or both operands to the same data type before performing the concatenation. In this case, we can convert the string `\"a\"` to an integer using the `int()` function.\n\nREMEDiation Summary:\nTo fix this issue, modify the code as follows:\n\n```python\ndef failing_code():\n    try:\n        1 / 0\n    except ZeroDivisionError:\n        \"a\" + int(1)\n\nfailing_code()\n```",
+    "learning_tips": [
+      "Inspect the runtime types flowing into the failing expression.",
+      "Add guards or conversions before combining incompatible values."
+    ],
+    "error_concept": "TypeError",
+    "success": false
+  },
+  "semantic_noop": {
+    "detail": [
+      {
+        "type": "extra_forbidden",
+        "loc": [
+          "body",
+          "file_path"
+        ],
+        "msg": "Extra inputs are not permitted",
+        "input": "/tmp/test.py"
+      }
+    ]
+  },
+  "large_snippet": {
+    "error": "Model inference failed",
+    "details": "Model inference failed: fix candidate did not pass validation (Fix drastically increased code complexity (Cyclomatic > 25).).",
+    "analysis": "The code execution failure was captured, but the AI model could not generate a valid fix.",
+    "explanation": "Check the model configuration, prompt output, or local runtime and try again.",
+    "verification": "Model inference failed before a verified patch could be produced.",
+    "fixed_code": null,
+    "severity": "INFO",
+    "confidence": 1,
+    "complexity": {
+      "functions": 0,
+      "classes": 0,
+      "loops": 0,
+      "conditions": 0,
+      "complexity_score": 0,
+      "grade": "F",
+      "loc": 0,
+      "comments": 0,
+      "top_complex": "N/A",
+      "mi_score": null,
+      "mi_grade": null
+    },
+    "security_audit": {
+      "count": 0,
+      "issues": [],
+      "is_secure": true,
+      "audit_timestamp": 1774864222.8277905,
+      "engine": "Bandit + Custom Heuristics"
+    },
+    "topology": null,
+    "metrics": {
+      "scan_rag": 0.0,
+      "viper_orchestration": 0.0,
+      "final_synthesis": 0.0,
+      "execution": 0.234,
+      "fast_mode": 0.0,
+      "cache_status": 0.0
+    },
+    "total_time": 268.888,
+    "source_path": null,
+    "source_code": "class ComplexSystem:\n    def __init__(self):\n        self.state = {}\n    \n    def dummy_0(self): return 0\\n    def dummy_1(self): return 1\\n    def dummy_2(self): return 2\\n    def dummy_3(self): return 3\\n    def dummy_4(self): return 4\\n    def dummy_5(self): return 5\\n    def dummy_6(self): return 6\\n    def dummy_7(self): return 7\\n    def dummy_8(self): return 8\\n    def dummy_9(self): return 9\\n    def dummy_10(self): return 10\\n    def dummy_11(self): return 11\\n    def dummy_12(self): return 12\\n    def dummy_13(self): return 13\\n    def dummy_14(self): return 14\\n    def dummy_15(self): return 15\\n    def dummy_16(self): return 16\\n    def dummy_17(self): return 17\\n    def dummy_18(self): return 18\\n    def dummy_19(self): return 19\\n    def dummy_20(self): return 20\\n    def dummy_21(self): return 21\\n    def dummy_22(self): return 22\\n    def dummy_23(self): return 23\\n    def dummy_24(self): return 24\\n    def dummy_25(self): return 25\\n    def dummy_26(self): return 26\\n    def dummy_27(self): return 27\\n    def dummy_28(self): return 28\\n    def dummy_29(self): return 29\\n    def dummy_30(self): return 30\\n    def dummy_31(self): return 31\\n    def dummy_32(self): return 32\\n    def dummy_33(self): return 33\\n    def dummy_34(self): return 34\\n    def dummy_35(self): return 35\\n    def dummy_36(self): return 36\\n    def dummy_37(self): return 37\\n    def dummy_38(self): return 38\\n    def dummy_39(self): return 39\\n    def dummy_40(self): return 40\\n    def dummy_41(self): return 41\\n    def dummy_42(self): return 42\\n    def dummy_43(self): return 43\\n    def dummy_44(self): return 44\\n    def dummy_45(self): return 45\\n    def dummy_46(self): return 46\\n    def dummy_47(self): return 47\\n    def dummy_48(self): return 48\\n    def dummy_49(self): return 49\n        \n    def process(self):\n        for i in range(10):\n            self.do_step(i)\n            \n    def do_step(self, x):\n        self.undefined_method(x)\n\nComplexSystem().process()\n",
+    "pipeline_mode": "full",
+    "stdout": "",
+    "stderr": "  File \"C:\\Users\\Sreeharini\\offline_debugger\\uploads\\_snippet_slts665c.py\", line 5\n    def dummy_0(self): return 0\\n    def dummy_1(self): return 1\\n    def dummy_2(self): return 2\\n    def dummy_3(self): return 3\\n    def dummy_4(self): return 4\\n    def dummy_5(self): return 5\\n    def dummy_6(self): return 6\\n    def dummy_7(self): return 7\\n    def dummy_8(self): return 8\\n    def dummy_9(self): return 9\\n    def dummy_10(self): return 10\\n    def dummy_11(self): return 11\\n    def dummy_12(self): return 12\\n    def dummy_13(self): return 13\\n    def dummy_14(self): return 14\\n    def dummy_15(self): return 15\\n    def dummy_16(self): return 16\\n    def dummy_17(self): return 17\\n    def dummy_18(self): return 18\\n    def dummy_19(self): return 19\\n    def dummy_20(self): return 20\\n    def dummy_21(self): return 21\\n    def dummy_22(self): return 22\\n    def dummy_23(self): return 23\\n    def dummy_24(self): return 24\\n    def dummy_25(self): return 25\\n    def dummy_26(self): return 26\\n    def dummy_27(self): return 27\\n    def dummy_28(self): return 28\\n    \n                                ^\nSyntaxError: unexpected character after line continuation character\n",
+    "exit_code": 1,
+    "timed_out": false,
+    "error_line": 5,
+    "error_type": "SyntaxError",
+    "execution_backend": "local_fallback",
+    "beginner_explanation": "The runtime error was reproduced, but model inference failed.",
+    "learning_tips": [
+      "Confirm the configured Qwen model file exists and loads successfully.",
+      "Review the model failure details before retrying the debug run."
+    ],
+    "error_concept": "SyntaxError",
+    "success": false
+  },
+  "fast_mode": {
+    "error": "File \"C:\\Users\\Sreeharini\\offline_debugger\\uploads\\_snippet_a60rcncq.py\", line 1\n    print('Hello World'\n         ^\nSyntaxError: '(' was never closed",
+    "details": null,
+    "analysis": "The error message \"SyntaxError: '(' was never closed\" indicates that the parentheses in the print statement are not properly closed. In Python, parentheses are used to define a function call or a tuple.",
+    "explanation": "The issue arises because the string 'Hello World' is being printed without any parentheses around it. The correct way to print a string in Python is by enclosing it within parentheses.\n\nREMEDiation Summary:\nTo fix this error, you need to add parentheses around the string 'Hello World'. Here's the corrected code:\n\n```python\nprint('Hello World')\n```",
+    "verification": "Model-generated fix verified in sandbox.",
+    "fixed_code": "print('Hello World')",
+    "severity": "INFO",
+    "confidence": 10,
+    "complexity": {
+      "functions": 0,
+      "classes": 0,
+      "loops": 0,
+      "conditions": 0,
+      "complexity_score": 0,
+      "grade": "F",
+      "loc": 0,
+      "comments": 0,
+      "top_complex": "N/A",
+      "mi_score": null,
+      "mi_grade": null
+    },
+    "security_audit": null,
+    "topology": null,
+    "metrics": {
+      "scan_rag": 0.001,
+      "viper_orchestration": 31.543,
+      "final_synthesis": 0.0,
+      "execution": 2.2,
+      "fast_mode": 1.0,
+      "cache_status": 0.0
+    },
+    "total_time": 33.94,
+    "source_path": null,
+    "source_code": "print('Hello World'",
+    "pipeline_mode": "fast",
+    "stdout": "",
+    "stderr": "  File \"C:\\Users\\Sreeharini\\offline_debugger\\uploads\\_snippet_a60rcncq.py\", line 1\n    print('Hello World'\n         ^\nSyntaxError: '(' was never closed\n",
+    "exit_code": 1,
+    "timed_out": false,
+    "error_line": 1,
+    "error_type": "SyntaxError",
+    "execution_backend": "local_fallback",
+    "beginner_explanation": "The script crashed with SyntaxError during execution.",
+    "learning_tips": [
+      "Run a syntax check before execution to catch parser issues early.",
+      "Review indentation and unmatched brackets around the failing line."
+    ],
+    "error_concept": "SyntaxError",
+    "success": false
+  },
+  "total_validation_time": 347.09297585487366
+}

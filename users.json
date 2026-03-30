@@ -22,5 +22,41 @@
     "display_name": "Sree",
     "hashed_password": "$2b$12$bqZhFmKs1R1f6Wk/nfIYze6AOvE7aregcKznUg2vwcrFwDfAAeHAC",
     "created_at": 1772731533.233253
+  },
+  "admintestuser": {
+    "username": "admintestuser",
+    "display_name": "admintestuser",
+    "hashed_password": "$2b$12$Omqq2bhOSa4OfYKVmzKJA.XQwlm8i1Jq64ngfZEHehluEit04qREm",
+    "created_at": 1774848793.6695187
+  },
+  "testuser": {
+    "username": "testuser",
+    "display_name": "Test Person",
+    "hashed_password": "$2b$12$Ej2U5201S8CskmppQ5UClOvOYKrjuRNTBRSTZIGA0zX9dSyKP4UzK",
+    "created_at": 1774848889.5783443
+  },
+  "testadmin": {
+    "username": "testadmin",
+    "display_name": "testadmin",
+    "hashed_password": "$2b$12$3wkvFXGZzI5CmJ6/SBR0J..x/JuaVU3HXMV0EcaTrdR98ndagdGRC",
+    "created_at": 1774849641.3080833
+  },
+  "testuser1234": {
+    "username": "testuser1234",
+    "display_name": "Test User",
+    "hashed_password": "$2b$12$VSNbLvGivvEa3gV23zubleRU27q.1Ido9W0IowVLpqI263f1K5TIu",
+    "created_at": 1774850057.38785
+  },
+  "testmanager": {
+    "username": "testmanager",
+    "display_name": "Test Manager",
+    "hashed_password": "$2b$12$TIFgZs8Uv8g9nfktNLEBY.sHRfAzvYUloVAr8DkWqhoPT53AIP1Ei",
+    "created_at": 1774850601.9507794
+  },
+  "audit_user": {
+    "username": "audit_user",
+    "display_name": "Audit Person",
+    "hashed_password": "$2b$12$UFtC0dH4GOX4cDdongIdgeGxCIbYDMXU6ucuCZFFVDzy3qS4w1i5K",
+    "created_at": 1774851464.772383
   }
 }
