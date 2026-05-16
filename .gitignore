@@ -13,3 +13,30 @@ dist/
 build/
 logs/
 *.spec
+
+# Security and local state
+.jwt_secret
+.workspace_root
+offline_debugger.db
+*.db
+*.db-shm
+*.db-wal
+
+# Test artifacts and temporary directories
+test_workspace_*
+test_patch_*
+demo_*
+.viper_uploads/
+tmp*.db
+
+# Scratch and report files
+*.txt
+*.docx
+report_*.md
+Project_Report.md
+chaos_test.py
+optimize_backend.py
+read_pdf.py
+
+# Release archives
+*.zip

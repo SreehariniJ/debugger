@@ -22,6 +22,35 @@ import {
 import { fetchJson, fetchJsonRaw, fetchJsonWithMeta } from './lib/api'
 import LoginPage from './LoginPage'
 import { CollaborationTab, SharedSessionList, SessionCollaboration } from './components/Collaboration'
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error, info) {
+    console.error('ErrorBoundary caught:', error, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '3rem', textAlign: 'center', color: '#f87171', background: '#09090b', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
+          <AlertCircle size={48} />
+          <h2 style={{ color: '#fff' }}>Something went wrong</h2>
+          <p style={{ color: '#a1a1aa', maxWidth: '500px' }}>{this.state.error?.message || 'An unexpected error occurred.'}</p>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload() }}
+            style={{ padding: '0.75rem 1.5rem', borderRadius: '0.75rem', background: 'linear-gradient(135deg, #a855f7, #7c3aed)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }}
+          >Reload App</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 const API = import.meta.env.VITE_API_URL || (window.location.port.startsWith('517') ? 'http://127.0.0.1:8001' : '')
 const HISTORY_STORAGE_KEY = 'offline_debugger_history_v1'
 const MODE_STORAGE_KEY = 'offline_debugger_mode_v1'
@@ -100,15 +129,15 @@ function formatRelativeAge(epochSeconds) {
   return `${Math.floor(delta / 86400)}d ago`
 }
 
-function DiffLine({ line }) {
+const DiffLine = React.memo(function DiffLine({ line }) {
   let bg = 'transparent', color = 'var(--text-muted)'
   if (line.startsWith('+') && !line.startsWith('+++')) { bg = 'rgba(16,185,129,0.1)'; color = '#34d399' }
   if (line.startsWith('-') && !line.startsWith('---')) { bg = 'rgba(239,68,68,0.1)'; color = '#f87171' }
   if (line.startsWith('@@')) { bg = 'rgba(96,165,250,0.08)'; color = '#60a5fa' }
   return <div style={{ background: bg, color, fontFamily: 'monospace', fontSize: '0.82rem', padding: '0 0.75rem', lineHeight: '1.7', whiteSpace: 'pre' }}>{line}</div>
-}
+})
 
-function EmptyStateCard({
+const EmptyStateCard = React.memo(function EmptyStateCard({
   icon: Icon = Info,
   title,
   description,
@@ -148,9 +177,9 @@ function EmptyStateCard({
       )}
     </div>
   )
-}
+})
 
-function TabHeader({ tabKey, titleOverride, descriptionOverride, actions = null }) {
+const TabHeader = React.memo(function TabHeader({ tabKey, titleOverride, descriptionOverride, actions = null }) {
   const [defaultTitle, defaultDescription] = TAB_META[tabKey] || ['Overview', '']
 
   return (
@@ -181,9 +210,9 @@ function TabHeader({ tabKey, titleOverride, descriptionOverride, actions = null 
       )}
     </div>
   )
-}
+})
 
-function StatCard({ label, value, icon, color }) {
+const StatCard = React.memo(function StatCard({ label, value, icon, color }) {
   const StatIcon = icon
   return (
     <div className="card glass" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -193,7 +222,7 @@ function StatCard({ label, value, icon, color }) {
       <div style={{ fontSize: '1.25rem', fontWeight: 700, color: color || 'var(--text-main)' }}>{value}</div>
     </div>
   )
-}
+})
 
 function Toast({ message, type = 'info', onClose }) {
   useEffect(() => {
@@ -201,7 +230,7 @@ function Toast({ message, type = 'info', onClose }) {
     return () => clearTimeout(timer)
   }, [onClose])
   
-  const bg = type === 'error' ? 'rgba(239, 68, 68, 0.95)' : type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(59, 130, 246, 0.95)';
+  const bg = type === 'error' ? 'rgb(185, 28, 28)' : type === 'success' ? 'rgb(5, 150, 105)' : 'rgb(37, 99, 235)';
   return (
     <Motion.div
       initial={{ opacity: 0, y: 50, scale: 0.9 }}
@@ -357,45 +386,84 @@ function WorkspacePanel({
           onAction={handlePickProject}
         />
       ) : (
-        <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-          <table className="elite-table">
-            <thead>
-              <tr>
-                <th style={{ width: '42px' }}>Pick</th>
-                <th>File Name</th>
-                <th>Path</th>
-                <th>Size</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {files.map((file, idx) => (
-                <tr key={idx}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selectedPaths.includes(file.path)}
-                      onChange={() => onTogglePath(file.path)}
-                      aria-label={`Select ${file.rel_path}`}
-                    />
-                  </td>
-                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{file.name}</td>
-                  <td style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>{file.rel_path}</td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{(file.size / 1024).toFixed(1)} KB</td>
-                  <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => onSelectFile(file.path)}>
-                      <Zap size={14} /> Debug File
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <VirtualizedFileTable
+          files={files}
+          selectedPaths={selectedPaths}
+          onTogglePath={onTogglePath}
+          onSelectFile={onSelectFile}
+        />
       )}
     </Motion.div>
   )
 }
+
+// Virtualized file table: only renders rows visible in viewport for large workspaces
+const ROW_HEIGHT = 44
+const TABLE_MAX_HEIGHT = 500
+
+const VirtualizedFileTable = React.memo(function VirtualizedFileTable({ files, selectedPaths, onTogglePath, onSelectFile }) {
+  const containerRef = useRef(null)
+  const [scrollTop, setScrollTop] = useState(0)
+
+  const totalHeight = files.length * ROW_HEIGHT
+  const visibleCount = Math.ceil(TABLE_MAX_HEIGHT / ROW_HEIGHT) + 2
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 1)
+  const endIdx = Math.min(files.length, startIdx + visibleCount)
+  const visibleFiles = files.slice(startIdx, endIdx)
+  const offsetY = startIdx * ROW_HEIGHT
+
+  const handleScroll = useCallback((e) => {
+    setScrollTop(e.currentTarget.scrollTop)
+  }, [])
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ maxHeight: `${TABLE_MAX_HEIGHT}px`, overflowY: 'auto' }}
+      onScroll={handleScroll}
+    >
+      <table className="elite-table">
+        <thead>
+          <tr>
+            <th style={{ width: '42px' }}>Pick</th>
+            <th>File Name</th>
+            <th>Path</th>
+            <th>Size</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {startIdx > 0 && (
+            <tr style={{ height: `${offsetY}px` }}><td colSpan={5} /></tr>
+          )}
+          {visibleFiles.map((file, idx) => (
+            <tr key={startIdx + idx} style={{ height: `${ROW_HEIGHT}px` }}>
+              <td>
+                <input
+                  type="checkbox"
+                  checked={selectedPaths.includes(file.path)}
+                  onChange={() => onTogglePath(file.path)}
+                  aria-label={`Select ${file.rel_path}`}
+                />
+              </td>
+              <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{file.name}</td>
+              <td style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>{file.rel_path}</td>
+              <td style={{ color: 'var(--text-secondary)' }}>{(file.size / 1024).toFixed(1)} KB</td>
+              <td>
+                <button className="btn btn-secondary btn-sm" onClick={() => onSelectFile(file.path)}>
+                  <Zap size={14} /> Debug File
+                </button>
+              </td>
+            </tr>
+          ))}
+          {endIdx < files.length && (
+            <tr style={{ height: `${(files.length - endIdx) * ROW_HEIGHT}px` }}><td colSpan={5} /></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+})
 
 function ComplexityPanel({ data, onOpenDebug }) {
   if (!data || (data.functions === 0 && data.classes === 0)) {
@@ -448,7 +516,7 @@ function ComplexityPanel({ data, onOpenDebug }) {
   )
 }
 
-const RadarChart = ({ score }) => {
+const RadarChartInner = ({ score }) => {
   const radius = 30;
   const cx = 40;
   const cy = 40;
@@ -468,6 +536,8 @@ const RadarChart = ({ score }) => {
     </svg>
   );
 };
+
+const RadarChart = React.memo(RadarChartInner);
 
 function SecurityPanel({ data, onOpenDebug }) {
   if (!data) {
@@ -582,18 +652,20 @@ function ViperAnalytics({ result, onOpenDebug }) {
         <div style={{ color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>PROCESSING TIME (MS)</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
           <span>Research Phase</span>
-          <span>{((result.metrics.scan_rag || result.metrics.viper_orchestration / 2) * 1000).toFixed(0)}ms</span>
+          <span>{(((result.metrics.scan_rag || result.metrics.viper_orchestration / 2) || 0) * 1000).toFixed(0)}ms</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
           <span>Synthesis Phase</span>
-          <span>{(result.metrics.final_synthesis * 1000).toFixed(0)}ms</span>
+          <span>{((result.metrics.final_synthesis || 0) * 1000).toFixed(0)}ms</span>
         </div>
       </div>
     </Motion.div>
   )
 }
 
-function ViperEditor({ original, fixed = '', onEdit }) {
+function ViperEditor({ original, fixed, onEdit }) {
+  const safeOriginal = typeof original === 'string' ? original : String(original ?? 'No context')
+  const safeFixed = typeof fixed === 'string' ? fixed : String(fixed ?? '')
   return (
     <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1px', background: 'var(--border)', borderRadius: '1rem', overflow: 'hidden', border: '1px solid var(--border)' }}>
       <div style={{ background: 'var(--bg-main)', padding: '1rem' }}>
@@ -601,17 +673,17 @@ function ViperEditor({ original, fixed = '', onEdit }) {
           <EyeOff size={12} /> ORIGINAL CODE
         </div>
         <SyntaxHighlighter language="python" style={vscDarkPlus} showLineNumbers={true} customStyle={{ margin: 0, padding: 0, fontSize: '0.8rem', background: 'transparent', height: '100%', minHeight: '300px' }}>
-          {original}
+          {safeOriginal}
         </SyntaxHighlighter>
       </div>
       <div style={{ background: 'rgba(16,185,129,0.03)', padding: '1rem' }}>
         <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--success)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><CheckCircle2 size={12} /> SUGGESTED FIX (EDITABLE)</div>
-          {fixed.length > 500 && <span style={{ opacity: 0.5 }}>AI GENERATED</span>}
+          {safeFixed.length > 500 && <span style={{ opacity: 0.5 }}>AI GENERATED</span>}
         </div>
         <textarea
           style={{ width: '100%', height: 'calc(100% - 20px)', minHeight: '300px', background: 'transparent', border: 'none', color: '#e4e4e7', fontFamily: 'monospace', fontSize: '0.8rem', resize: 'none', outline: 'none', lineHeight: '1.5' }}
-          value={fixed}
+          value={safeFixed}
           onChange={(e) => onEdit(e.target.value)}
         />
       </div>
@@ -641,7 +713,7 @@ function buildExecutionTraceText(result, loading) {
   return sections.join('\n')
 }
 
-function TerminalPanel({ result, loading }) {
+const TerminalPanel = React.memo(function TerminalPanel({ result, loading }) {
   return (
     <div style={{ borderRadius: '0.75rem', border: '1px solid var(--border)', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
       <SyntaxHighlighter
@@ -654,7 +726,7 @@ function TerminalPanel({ result, loading }) {
       </SyntaxHighlighter>
     </div>
   )
-}
+})
 
 function FixValidationPanel({ validation, loading }) {
   if (loading) {
@@ -915,7 +987,7 @@ function MetricsPanel({ metrics, loading, error, onRefresh }) {
 }
 
 export const globalToastManager = {
-  addToast: (message, type) => console.log("Toast miss:", message)
+  addToast: (message, type) => { /* no-op until hydrated */ }
 };
 
 function App() {
@@ -1376,12 +1448,38 @@ function MainApp({ authUser, onLogout }) {
           signal: controller.signal
         })
       } else {
-        data = await fetchJson(`${API}/debug`, {
+        const reqBody = { file_path: activePath, mode: debugMode }
+        
+        // Fire precheck concurrently
+        const preCheckPromise = fetchJson(`${API}/pre_check`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_path: activePath, mode: debugMode }),
+          body: JSON.stringify(reqBody),
+          signal: controller.signal
+        }).catch(() => null) // Ignore precheck network errors
+        
+        // Fire full deep analysis
+        const fullCheckPromise = fetchJson(`${API}/debug`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqBody),
           signal: controller.signal
         })
+
+        // Await preliminary step to populate UI instantly
+        const preCheckData = await preCheckPromise;
+        if (preCheckData && !controller.signal.aborted) {
+          setResult(preCheckData)
+          if (!preCheckData.success) {
+            addToast(`Preliminary check found a ${preCheckData.error_type}. Running deep analysis for fix...`, 'info')
+            setStatus(`Initial scan found error. Waiting for LLM deep analysis...`)
+          } else {
+            setStatus('Initial scan clean. Running deep sandbox execution...')
+          }
+        }
+        
+        // Block until full analysis returns and seamlessly overwrite data
+        data = await fullCheckPromise;
       }
       const isCached = data.metrics?.cache_status === 1.0
       const resolvedPath = data.source_path || activePath || filePath
@@ -1708,13 +1806,15 @@ function MainApp({ authUser, onLogout }) {
       file.name.toLowerCase().includes(query) || file.rel_path.toLowerCase().includes(query)
     )).slice(0, 10)
   }, [workspaceFiles, paletteQuery])
-  const runTargetLabel = getRunTargetLabel(result, mode, filePath)
-  const runStatusLabel = result ? (result.success ? 'No Issues Found' : 'Error Found') : ''
-  const runStatusTone = result?.success ? 'var(--success)' : 'var(--error)'
-  const runStatusBackground = result?.success ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)'
-  const executionTimeLabel = formatDuration(result?.total_time)
-  const failureHeadline = getFailureHeadline(result)
-  const failureReason = getFailureReason(result)
+
+  // Memoize derived display values to avoid recomputation on every render
+  const runTargetLabel = useMemo(() => getRunTargetLabel(result, mode, filePath), [result, mode, filePath])
+  const runStatusLabel = useMemo(() => result ? (result.success ? 'No Issues Found' : 'Error Found') : '', [result])
+  const runStatusTone = useMemo(() => result?.success ? 'var(--success)' : 'var(--error)', [result?.success])
+  const runStatusBackground = useMemo(() => result?.success ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', [result?.success])
+  const executionTimeLabel = useMemo(() => formatDuration(result?.total_time), [result?.total_time])
+  const failureHeadline = useMemo(() => getFailureHeadline(result), [result])
+  const failureReason = useMemo(() => getFailureReason(result), [result])
 
   return (
     <div className="app-layout">
@@ -2121,7 +2221,7 @@ function MainApp({ authUser, onLogout }) {
                             </summary>
                             <div style={{ borderTop: '1px solid var(--border)' }}>
                               <SyntaxHighlighter language="text" style={vscDarkPlus} showLineNumbers={true} customStyle={{ margin: 0, padding: '1.5rem', fontSize: '0.85rem', background: 'transparent' }}>
-                                {result.error}
+                                {result.error || 'No traceback available.'}
                               </SyntaxHighlighter>
                             </div>
                           </details>
@@ -2326,4 +2426,10 @@ function MainApp({ authUser, onLogout }) {
   )
 }
 
-export default App
+export default function AppWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  )
+}

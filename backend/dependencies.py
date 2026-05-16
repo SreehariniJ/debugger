@@ -17,7 +17,7 @@ from backend.caching import TimedResponseCache, TimedValueCache, InMemoryRateLim
 from backend.config import (
     SCAN_CACHE_TTL_SECONDS, THREAD_POOL_WORKERS,
     CACHE_TTL_SECONDS, CACHE_MAX_ENTRIES, ANALYSIS_CACHE_TTL_SECONDS,
-    WORKSPACE_INSIGHTS_TTL_SECONDS, PIPELINE_CONCURRENCY, MODEL_PATH,
+    WORKSPACE_INSIGHTS_TTL_SECONDS, PIPELINE_CONCURRENCY,
     RATE_LIMIT_PER_MINUTE, get_workspace_root, set_workspace_root
 )
 from backend.auth import decode_access_token, get_user_by_username
@@ -42,7 +42,7 @@ def get_rag() -> LocalRAGEngine:
 
 @lru_cache()
 def get_agents() -> DebuggingAgents:
-    return DebuggingAgents(model_path=MODEL_PATH)
+    return DebuggingAgents()
 
 @lru_cache()
 def _build_executor() -> ThreadPoolExecutor:
@@ -111,13 +111,32 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
     return user
 
-# --- Transitional Globals (For Unmigrated Routers) ---
-scanner = get_scanner()
-rag = get_rag()
-agents = get_agents()
-executor = get_executor()
-rate_limiter = get_rate_limiter()
-debug_cache = get_debug_cache()
-analysis_cache = get_analysis_cache()
-workspace_insights_cache = get_workspace_insights_cache()
-pipeline_semaphore = get_pipeline_semaphore()
+# --- Lazy Transitional Globals (For Unmigrated Routers) ---
+# These use __getattr__ pattern to avoid eager model/service loading at import time,
+# which speeds up startup and avoids import-time side effects in test contexts.
+class _LazyProxy:
+    """Defers singleton construction until first attribute access."""
+    __slots__ = ("_factory", "_instance")
+    def __init__(self, factory):
+        object.__setattr__(self, "_factory", factory)
+        object.__setattr__(self, "_instance", None)
+    def _resolve(self):
+        inst = object.__getattribute__(self, "_instance")
+        if inst is None:
+            inst = object.__getattribute__(self, "_factory")()
+            object.__setattr__(self, "_instance", inst)
+        return inst
+    def __getattr__(self, name):
+        return getattr(self._resolve(), name)
+    def __call__(self, *args, **kwargs):
+        return self._resolve()(*args, **kwargs)
+
+scanner = _LazyProxy(get_scanner)
+rag = _LazyProxy(get_rag)
+agents = _LazyProxy(get_agents)
+executor = _LazyProxy(get_executor)
+rate_limiter = _LazyProxy(get_rate_limiter)
+debug_cache = _LazyProxy(get_debug_cache)
+analysis_cache = _LazyProxy(get_analysis_cache)
+workspace_insights_cache = _LazyProxy(get_workspace_insights_cache)
+pipeline_semaphore = _LazyProxy(get_pipeline_semaphore)

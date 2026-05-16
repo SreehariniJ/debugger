@@ -27,7 +27,6 @@ logger = logging.getLogger("offline_debugger.patch")
 
 # ── Try importing GitPython (optional dependency) ───────────────────────────
 try:
-    import git
     from git import Repo, InvalidGitRepositoryError, GitCommandError
     GIT_AVAILABLE = True
 except ImportError:

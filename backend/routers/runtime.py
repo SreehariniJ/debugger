@@ -8,7 +8,6 @@ All user code execution is delegated to the Docker-based sandbox engine
 from __future__ import annotations
 
 import sys
-import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException

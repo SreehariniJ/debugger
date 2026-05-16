@@ -1,17 +1,17 @@
 import os
 import sys
-import uuid
-import time
-import shutil
-import zipfile
-import io
+
+
+
+
+
 import subprocess
 import hashlib
 import json
 import difflib
 from pathlib import Path
-from fastapi import HTTPException, UploadFile
-from backend.config import MAX_PROJECT_UPLOAD_BYTES, get_workspace_root, logger
+from fastapi import HTTPException
+from backend.config import get_workspace_root, logger
 
 def _safe_resolve_workspace_path(
     raw_path: str,

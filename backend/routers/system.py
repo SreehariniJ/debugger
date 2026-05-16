@@ -18,8 +18,8 @@ def health_check():
     # Note: frontend check is kept in main app or handled here if PROJECT_ROOT is available
     return {
         "status": "online",
-        "model_loaded": agents.llm is not None,
-        "model_path": agents.model_path,
+        "model_loaded": agents.llm_1_5b is not None or agents.llm_7b is not None,
+        "model_path": getattr(agents, "model_path", "Dual-Model Configuration (1.5B/7B)"),
         "workspace_root": str(get_workspace_root()),
         "uptime_seconds": int(uptime_seconds),
         "frontend_ready": (PROJECT_ROOT / "frontend" / "dist").exists(),

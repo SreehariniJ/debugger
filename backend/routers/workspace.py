@@ -1,4 +1,4 @@
-import os
+
 import sys
 import time
 import uuid
@@ -23,7 +23,7 @@ from backend.dependencies import (
     run_in_executor
 )
 from backend.utils import (
-    _safe_resolve_workspace_path, _safe_project_archive_name, 
+    _safe_project_archive_name, 
     _safe_project_relative_path, _project_slug_from_archive,
     _open_native_folder_picker, _persist_workspace_root,
     _etag_for_payload
@@ -189,7 +189,6 @@ async def browse_workspace_root():
         raise HTTPException(status_code=500, detail=str(exc))
 
 def _extract_workspace_archive(payload: bytes, archive_name: str) -> tuple[Path, int, int]:
-    from backend.config import MAX_PROJECT_UPLOAD_BYTES
     projects_root = UPLOADED_PROJECTS_ROOT
     projects_root.mkdir(parents=True, exist_ok=True)
 
@@ -231,7 +230,6 @@ def _extract_workspace_archive(payload: bytes, archive_name: str) -> tuple[Path,
     return destination, extracted_files, python_files
 
 async def _store_uploaded_workspace_folder(files: list[UploadFile], relative_paths: list[str]) -> tuple[Path, int, int]:
-    from backend.config import MAX_PROJECT_UPLOAD_BYTES
     normalized_files = []
     total_size = 0
     for idx, uploaded in enumerate(files):
@@ -278,7 +276,6 @@ async def upload_workspace_project(
     files: list[UploadFile] | None = File(default=None),
     relative_paths: list[str] = Form(default=[]),
 ):
-    from backend.config import MAX_PROJECT_UPLOAD_BYTES
     uploaded_files = [item for item in (files or []) if item is not None]
 
     if uploaded_files:

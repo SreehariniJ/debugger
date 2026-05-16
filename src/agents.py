@@ -12,6 +12,16 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+from functools import lru_cache
+
+_JSON_EXTRACT_RE = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL)
+_JSON_OBJECT_EXTRACT_RE = re.compile(r"\{.*\}", re.DOTALL)
+_CODE_EXTRACT_RE = re.compile(r"```(?:python)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+_ANALYSIS_RE = re.compile(r"ANALYSIS:\s*(.*?)\s*EXPLANATION:", re.DOTALL | re.IGNORECASE)
+_EXPLANATION_RE = re.compile(r"EXPLANATION:\s*(.*?)\s*STATUS:", re.DOTALL | re.IGNORECASE)
+_STATUS_RE = re.compile(r"STATUS:\s*(.*)$", re.DOTALL | re.IGNORECASE)
+_ROOT_CAUSE_RE = re.compile(r"ROOT_CAUSE:\s*(.*?)\s*FIXED_CODE:", re.DOTALL | re.IGNORECASE)
+_FIXED_CODE_RE = re.compile(r"FIXED_CODE:\s*```(?:python)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 
 try:
     from llama_cpp import Llama
@@ -29,7 +39,8 @@ from backend.config import (
     MODEL_BATCH_SIZE,
     MODEL_CONTEXT_TOKENS,
     MODEL_MAX_OUTPUT_TOKENS,
-    MODEL_PATH,
+    MODEL_1_5B_PATH,
+    MODEL_7B_PATH,
     MODEL_RETRY_ATTEMPTS,
     MODEL_RETRY_TEMPERATURE,
     MODEL_TEMPERATURE,
@@ -62,12 +73,12 @@ class ModelInferenceError(RuntimeError):
 
 
 class DebuggingAgents:
-    def __init__(self, model_path: str = MODEL_PATH):
-        self.model_path = str(Path(model_path or MODEL_PATH).expanduser().resolve())
-        self.llm = None
+    def __init__(self):
+        self.llm_1_5b = None
+        self.llm_7b = None
         self.initialization_error: str | None = None
         self._lock = threading.Lock()  # llama.cpp is NOT thread-safe
-        self._initialize_model()
+        self._initialize_models()
 
     def clean_response(self, text: str, start_phrase: str) -> str:
         """Strict filter to keep output concise and parse-safe."""
@@ -86,7 +97,7 @@ class DebuggingAgents:
 
         return f"{start_phrase} {clean_text}"
 
-    def _initialize_model(self) -> None:
+    def _initialize_models(self) -> None:
         if _env_flag("OFFLINE_DEBUGGER_DISABLE_MODEL"):
             self.initialization_error = "Model loading disabled via OFFLINE_DEBUGGER_DISABLE_MODEL."
             logger.error("MODEL FAILED: %s", self.initialization_error)
@@ -97,46 +108,63 @@ class DebuggingAgents:
             logger.error("MODEL FAILED: %s", self.initialization_error)
             return
 
-        model_path = Path(self.model_path)
-        if not model_path.exists():
-            self.initialization_error = f"Configured model file was not found at {model_path}"
-            logger.error("MODEL FAILED: %s", self.initialization_error)
-            return
+        for tier, path_val in [("1.5B", MODEL_1_5B_PATH), ("7B", MODEL_7B_PATH)]:
+            model_path = Path(path_val).expanduser().resolve()
+            if not model_path.exists():
+                err = f"Configured model file was not found at {model_path}"
+                self.initialization_error = err if not self.initialization_error else self.initialization_error + " " + err
+                logger.error("MODEL FAILED (%s): %s", tier, err)
+                continue
 
-        try:
-            self.llm = Llama(
-                model_path=str(model_path),
-                n_ctx=MODEL_CONTEXT_TOKENS,
-                n_threads=MODEL_THREADS,
-                n_batch=MODEL_BATCH_SIZE,
-                verbose=False,
-            )
-            self.initialization_error = None
-            logger.info(
-                "MODEL LOADED: path=%s threads=%s ctx=%s batch=%s",
-                model_path,
-                MODEL_THREADS,
-                MODEL_CONTEXT_TOKENS,
-                MODEL_BATCH_SIZE,
-            )
-        except Exception as exc:  # pragma: no cover - depends on local runtime/GGUF
-            self.llm = None
-            self.initialization_error = f"Failed to initialize model: {exc}"
-            logger.exception("MODEL FAILED: %s", self.initialization_error)
+            try:
+                llm_instance = Llama(
+                    model_path=str(model_path),
+                    n_ctx=MODEL_CONTEXT_TOKENS,
+                    n_threads=MODEL_THREADS,
+                    n_batch=MODEL_BATCH_SIZE,
+                    verbose=False,
+                )
+                if tier == "1.5B":
+                    self.llm_1_5b = llm_instance
+                else:
+                    self.llm_7b = llm_instance
+                logger.info("MODEL LOADED (%s): path=%s threads=%s ctx=%s batch=%s", tier, model_path, MODEL_THREADS, MODEL_CONTEXT_TOKENS, MODEL_BATCH_SIZE)
+            except Exception as exc:  # pragma: no cover
+                err = f"Failed to initialize {tier} model: {exc}"
+                self.initialization_error = err if not self.initialization_error else self.initialization_error + " " + err
+                logger.exception("MODEL FAILED (%s): %s", tier, err)
+                
+        # Warm up models in the background to prevent first-token latency
+        import threading
+        def _warmup(model_instance):
+            if model_instance:
+                try:
+                    with self._lock:
+                        model_instance(" ", max_tokens=1)
+                except Exception:
+                    pass
+        threading.Thread(target=_warmup, args=(self.llm_1_5b,), daemon=True).start()
+        threading.Thread(target=_warmup, args=(self.llm_7b,), daemon=True).start()
 
-    def ensure_model_ready(self) -> None:
-        if self.llm is None:
-            raise ModelConfigurationError(
-                self.initialization_error or f"Model is unavailable at {self.model_path}"
-            )
+    def ensure_model_ready(self, model_tier: str = "1.5B") -> 'Llama':
+        target = self.llm_7b if model_tier == "7B" else self.llm_1_5b
+        fallback = self.llm_1_5b if model_tier == "7B" else self.llm_7b
+        
+        if target is not None:
+            return target
+        if fallback is not None:
+            logger.warning("Requested %s model unavailable. Falling back to available model.", model_tier)
+            return fallback
+
+        raise ModelConfigurationError(self.initialization_error or "All models are unavailable.")
 
     def _extract_json_payload(self, raw: str) -> dict[str, Any]:
         clean = raw.strip()
-        fenced = re.search(r"```json\s*(\{.*?\})\s*```", clean, re.DOTALL)
+        fenced = _JSON_EXTRACT_RE.search(clean)
         if fenced:
             clean = fenced.group(1).strip()
         else:
-            object_match = re.search(r"\{.*\}", clean, re.DOTALL)
+            object_match = _JSON_OBJECT_EXTRACT_RE.search(clean)
             if object_match:
                 clean = object_match.group(0).strip()
 
@@ -147,11 +175,12 @@ class DebuggingAgents:
 
     def _extract_code_candidate(self, raw: str) -> str:
         clean = raw.strip()
-        fenced = re.search(r"```(?:python)?\s*(.*?)```", clean, re.DOTALL | re.IGNORECASE)
+        fenced = _CODE_EXTRACT_RE.search(clean)
         if fenced:
             clean = fenced.group(1).strip()
         return clean
 
+    @lru_cache(maxsize=256)
     def _ast_signature(self, code_text: str) -> str | None:
         try:
             parsed = ast.parse(code_text)
@@ -186,8 +215,16 @@ class DebuggingAgents:
         temperature: float = MODEL_TEMPERATURE,
         stop: list[str] | None = None,
         repeat_penalty: float = 1.1,
+        model_tier: str = "1.5B",
     ) -> str:
-        self.ensure_model_ready()
+        if not hasattr(self, "_llm_cache"):
+            self._llm_cache = {}
+            
+        cache_key = f"{model_tier}:{hash(prompt)}:{temperature}"
+        if cache_key in self._llm_cache:
+            return self._llm_cache[cache_key]
+
+        llm_instance = self.ensure_model_ready(model_tier)
         logger.info(
             "MODEL CALL STARTED: prompt_chars=%s max_tokens=%s temperature=%s",
             len(prompt),
@@ -204,7 +241,7 @@ class DebuggingAgents:
                 }
                 if stop:
                     call_kwargs["stop"] = stop
-                output = self.llm(prompt, **call_kwargs)
+                output = llm_instance(prompt, **call_kwargs)
             response_text = output["choices"][0]["text"].strip()
         except Exception as exc:  # pragma: no cover - runtime dependent
             logger.exception("MODEL FAILED: %s", exc)
@@ -215,10 +252,15 @@ class DebuggingAgents:
             raise ModelInferenceError("Model inference failed: empty response received from the model.")
 
         logger.info("MODEL RESPONSE RECEIVED: chars=%s", len(response_text))
+        self._llm_cache[cache_key] = response_text
         return response_text
 
-    def multi_agent_pipeline(self, error: str, context: str, knowledge: str) -> dict[str, str]:
+    def multi_agent_pipeline(self, error: str, context: str, knowledge: str, model_tier: str = "7B") -> dict[str, str]:
         """Consolidate analysis/explanation/verification into one LLM call."""
+        # Truncate inputs to reduce prompt size and improve inference speed
+        truncated_error = error[-1500:] if len(error) > 1500 else error
+        truncated_context = context[-3000:] if len(context) > 3000 else context
+        truncated_knowledge = (knowledge or "None")[-500:]
         prompt = f"""<|im_start|>system
 You are an expert Python debugger.
 Given the code, traceback, and supporting notes:
@@ -234,13 +276,13 @@ STATUS:
 <|im_end|>
 <|im_start|>user
 Code:
-{context}
+{truncated_context}
 
 Traceback:
-{error}
+{truncated_error}
 
 Supporting Notes:
-{knowledge or "None"}
+{truncated_knowledge}
 <|im_end|>
 <|im_start|>assistant
 ANALYSIS:
@@ -254,15 +296,12 @@ ANALYSIS:
                     prompt,
                     max_tokens=MODEL_ANALYSIS_MAX_TOKENS,
                     temperature=temperature,
+                    model_tier=model_tier,
                 )
                 clean = f"ANALYSIS:\n{raw.strip()}"
-                analysis_match = re.search(r"ANALYSIS:\s*(.*?)\s*EXPLANATION:", clean, re.DOTALL | re.IGNORECASE)
-                explanation_match = re.search(
-                    r"EXPLANATION:\s*(.*?)\s*STATUS:",
-                    clean,
-                    re.DOTALL | re.IGNORECASE,
-                )
-                status_match = re.search(r"STATUS:\s*(.*)$", clean, re.DOTALL | re.IGNORECASE)
+                analysis_match = _ANALYSIS_RE.search(clean)
+                explanation_match = _EXPLANATION_RE.search(clean)
+                status_match = _STATUS_RE.search(clean)
                 analysis = analysis_match.group(1).strip() if analysis_match else ""
                 explanation = explanation_match.group(1).strip() if explanation_match else ""
                 status = status_match.group(1).strip() if status_match else ""
@@ -310,9 +349,42 @@ ANALYSIS:
     def _heuristic_fallback_fix(self, context: str, error: str) -> str:
         raise ModelInferenceError("Heuristic fallback is disabled. The debugger requires a real model response.")
 
-    def code_fixer_agent(self, context: str, error: str, attempt: int = 1) -> str:
+    @staticmethod
+    def strip_unused_imports(code_text: str) -> str:
+        """Safely strip totally unused top-level library imports using AST."""
+        try:
+            tree = ast.parse(code_text)
+        except SyntaxError:
+            return code_text
+            
+        used_names = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                used_names.add(node.id)
+
+        unused_lines = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                if all((alias.asname or alias.name.split('.')[0]) not in used_names for alias in node.names):
+                    unused_lines.add(node.lineno)
+            elif isinstance(node, ast.ImportFrom):
+                if getattr(node, "module", "") == "__future__": continue
+                if all((alias.asname or alias.name) not in used_names for alias in node.names):
+                    unused_lines.add(node.lineno)
+
+        if not unused_lines:
+            return code_text
+            
+        lines = code_text.splitlines()
+        for lineno in reversed(sorted(unused_lines)):
+            if 1 <= lineno <= len(lines):
+                lines.pop(lineno - 1)
+                
+        return chr(10).join(lines)
+
+    def code_fixer_agent(self, context: str, error: str, attempt: int = 1, model_tier: str = "1.5B") -> str:
         """Rewrite script to fix detected error using guarded prompting."""
-        self.ensure_model_ready()
+        self.ensure_model_ready(model_tier)
         last_error: Exception | None = None
 
         for retry_index in range(MODEL_RETRY_ATTEMPTS):
@@ -340,10 +412,10 @@ FIXED_CODE:
 <|im_end|>
 <|im_start|>user
 Code:
-{context}
+{context[-3000:]}
 
 Traceback:
-{error}
+{error[-1500:]}
 <|im_end|>
 <|im_start|>assistant
 ROOT_CAUSE:
@@ -354,18 +426,11 @@ ROOT_CAUSE:
                     prompt,
                     max_tokens=MODEL_MAX_OUTPUT_TOKENS,
                     temperature=MODEL_TEMPERATURE if current_attempt == 1 else MODEL_RETRY_TEMPERATURE,
+                    model_tier=model_tier,
                 )
                 clean = f"ROOT_CAUSE:\n{raw.strip()}"
-                root_cause_match = re.search(
-                    r"ROOT_CAUSE:\s*(.*?)\s*FIXED_CODE:",
-                    clean,
-                    re.DOTALL | re.IGNORECASE,
-                )
-                code_match = re.search(
-                    r"FIXED_CODE:\s*```(?:python)?\s*(.*?)```",
-                    clean,
-                    re.DOTALL | re.IGNORECASE,
-                )
+                root_cause_match = _ROOT_CAUSE_RE.search(clean)
+                code_match = _FIXED_CODE_RE.search(clean)
                 root_cause = root_cause_match.group(1).strip() if root_cause_match else ""
                 fixed = self._validate_generated_fix(context, code_match.group(1).strip() if code_match else "")
                 if not root_cause:
@@ -439,7 +504,8 @@ ROOT_CAUSE:
         for path in relevant_paths:
             try:
                 with open(path, encoding="utf-8", errors="replace") as file_obj:
-                    augmented_context += f"\n\n# Context from {os.path.basename(path)}:\n" + file_obj.read()
+                    file_content = file_obj.read()[-2000:]  # Limit per-file context
+                    augmented_context += f"\n\n# Context from {os.path.basename(path)}:\n" + file_content
             except OSError:
                 continue
 
@@ -462,6 +528,7 @@ ROOT_CAUSE:
             f"Model inference failed: fix candidate did not pass validation ({last_reason or 'unknown reason'})."
         )
 
+    @lru_cache(maxsize=512)
     def severity_agent(self, error: str) -> str:
         error_lower = error.lower()
         if any(
@@ -476,6 +543,7 @@ ROOT_CAUSE:
             return "WARNING"
         return "INFO"
 
+    @lru_cache(maxsize=128)
     def complexity_agent(self, code_text: str) -> dict[str, Any]:
         """AST-based cyclomatic complexity analysis with summary metrics."""
         try:
@@ -634,6 +702,7 @@ ROOT_CAUSE:
             "engine": "Bandit + Custom Heuristics",
         }
 
+    @lru_cache(maxsize=256)
     def confidence_agent(self, error: str, analysis: str, fixed_code: str | None) -> int:
         """Score fix confidence 1-10 using stable heuristics."""
         score = 7

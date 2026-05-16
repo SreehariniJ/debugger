@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import secrets
 import time
-from pathlib import Path
 from typing import Any
 
 from jose import JWTError, jwt

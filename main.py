@@ -2,6 +2,7 @@ import time
 import uuid
 import sys
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, FileResponse
@@ -24,6 +25,18 @@ from backend.auth import bootstrap_auth_data
 
 ensure_runtime_paths()
 
+async def _eventbus_gc():
+    from backend.services.event_bus import get_event_bus
+    import logging
+    while True:
+        try:
+            await asyncio.sleep(60)
+            await get_event_bus().cleanup_expired()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logging.getLogger("offline_debugger.event_bus_gc").error("GC error: %s", e)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -33,7 +46,18 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     logger.info("Startup workspace_root=%s", WORKSPACE_ROOT)
+    
+    # Start EventBus Garbage Collector
+    gc_task = asyncio.create_task(_eventbus_gc())
+    
     yield
+    
+    gc_task.cancel()
+    try:
+        await gc_task
+    except asyncio.CancelledError:
+        pass
+        
     get_executor().shutdown(wait=False, cancel_futures=True)
 
 app = FastAPI(
@@ -137,7 +161,7 @@ async def request_context_middleware(request: Request, call_next):
             _apply_common_response_headers(response, request_id, elapsed_ms, path)
             return response
 
-    if not _is_auth_exempt(path):
+    if request.method != "OPTIONS" and not _is_auth_exempt(path):
         token = _extract_bearer_token(request)
         if not token:
             elapsed_ms = (time.perf_counter() - started) * 1000

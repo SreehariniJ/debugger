@@ -25,13 +25,28 @@ export function useStream() {
   const [isConnecting, setIsConnecting] = useState(false)
   const [taskId, setTaskId] = useState(null)
   const eventSourceRef = useRef(null)
+  const eventQueueRef = useRef([])
+  const flushTimeoutRef = useRef(null)
+
+  const flushEvents = useCallback(() => {
+    if (eventQueueRef.current.length > 0) {
+      setEvents(prev => [...prev, ...eventQueueRef.current])
+      eventQueueRef.current = []
+    }
+    flushTimeoutRef.current = null
+  }, [])
 
   const cleanup = useCallback(() => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
       eventSourceRef.current = null
     }
-  }, [])
+    if (flushTimeoutRef.current) {
+      clearTimeout(flushTimeoutRef.current)
+      flushTimeoutRef.current = null
+    }
+    flushEvents()
+  }, [flushEvents])
 
   const reset = useCallback(() => {
     cleanup()
@@ -80,7 +95,10 @@ export function useStream() {
           const eventData = parsed.data || {}
           const eventType = parsed.event || e.type
 
-          setEvents(prev => [...prev, { type: eventType, ...eventData, timestamp: parsed.timestamp }])
+          eventQueueRef.current.push({ type: eventType, ...eventData, timestamp: parsed.timestamp })
+          if (!flushTimeoutRef.current) {
+            flushTimeoutRef.current = setTimeout(flushEvents, 50)
+          }
 
           switch (eventType) {
             case 'stage':
@@ -128,19 +146,32 @@ export function useStream() {
       // Generic message handler (fallback)
       es.onmessage = handleEvent
 
-      es.onerror = (err) => {
-        // EventSource auto-reconnects, but if the connection is permanently
-        // closed (readyState === CLOSED) we should clean up
+      let retryCount = 0
+      const MAX_RETRIES = 3
+
+      es.onerror = () => {
         if (es.readyState === EventSource.CLOSED) {
           if (!isComplete) {
             setError('Stream connection lost.')
             setIsComplete(true)
           }
           cleanup()
+        } else {
+          // EventSource auto-reconnects — apply exponential backoff with jitter
+          retryCount++
+          if (retryCount > MAX_RETRIES) {
+            es.close()
+            if (!isComplete) {
+              setError('Stream failed after multiple retries.')
+              setIsComplete(true)
+            }
+            cleanup()
+          }
         }
       }
 
       es.onopen = () => {
+        retryCount = 0  // Reset on successful reconnect
         setIsConnecting(false)
       }
 

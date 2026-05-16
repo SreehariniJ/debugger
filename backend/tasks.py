@@ -21,7 +21,7 @@ from pathlib import Path
 from backend.celery_app import celery_app
 from backend.config import (
     FAST_MODE_DEFAULT, ENABLE_SECURITY_AUDIT, MODEL_PATH,
-    WORKSPACE_ROOT, SCAN_CACHE_TTL_SECONDS, logger,
+    WORKSPACE_ROOT, SCAN_CACHE_TTL_SECONDS,
 )
 
 logger = logging.getLogger("offline_debugger.tasks")
@@ -176,7 +176,7 @@ def run_debug_pipeline(self, task_id: str, file_path: str, mode: str | None = No
             "total_stages": 6,
         })
 
-        if agents.llm is None:
+        if agents.llm_1_5b is None and agents.llm_7b is None:
             orchestration_result = {
                 "success": False, "fix": "",
                 "reason": "Model unavailable", "path_taken": "fallback",

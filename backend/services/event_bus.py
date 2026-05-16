@@ -27,9 +27,11 @@ import json
 import logging
 import time
 from collections import defaultdict, deque
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import AsyncGenerator, Any, Optional
+
+from backend.config import EVENTBUS_TTL_SECONDS, EVENTBUS_MAX_EVENTS
 
 logger = logging.getLogger("offline_debugger.event_bus")
 
@@ -70,11 +72,11 @@ class EventBus:
     - Channels auto-expire after a configurable TTL.
     """
 
-    def __init__(self, channel_ttl_seconds: int = 300, max_events_per_channel: int = 200):
+    def __init__(self, channel_ttl_seconds: int = EVENTBUS_TTL_SECONDS, max_events_per_channel: int = EVENTBUS_MAX_EVENTS):
         self._channels: dict[str, deque[StreamEvent]] = defaultdict(
             lambda: deque(maxlen=max_events_per_channel)
         )
-        self._waiters: dict[str, asyncio.Event] = defaultdict(asyncio.Event)
+        self._waiters: dict[str, asyncio.Event] = {}
         self._completed: set[str] = set()
         self._created_at: dict[str, float] = {}
         self._ttl = channel_ttl_seconds
@@ -95,10 +97,9 @@ class EventBus:
         if event_type in (EventType.COMPLETE, EventType.ERROR, EventType.RESULT):
             self._completed.add(task_id)
 
-        # Wake up any waiting subscriber
-        waiter = self._waiters.get(task_id)
-        if waiter:
-            waiter.set()
+        if task_id not in self._waiters:
+            self._waiters[task_id] = asyncio.Event()
+        self._waiters[task_id].set()
 
         logger.debug("Published %s to task %s: %s", event_type.value, task_id, data.get("message", ""))
 
@@ -130,7 +131,8 @@ class EventBus:
                     if evt.event in (EventType.COMPLETE, EventType.ERROR):
                         return
             else:
-                # No new events — wait for the next publish
+                if task_id not in self._waiters:
+                    self._waiters[task_id] = asyncio.Event()
                 waiter = self._waiters[task_id]
                 waiter.clear()
                 try:
@@ -181,7 +183,7 @@ class EventBus:
         now = time.time()
         expired = [
             tid for tid, created in self._created_at.items()
-            if now - created > self._ttl and tid in self._completed
+            if now - created > self._ttl
         ]
         for tid in expired:
             self._channels.pop(tid, None)

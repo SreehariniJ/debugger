@@ -48,10 +48,17 @@ import sys
 import tempfile
 import time
 import uuid
+import json
+import concurrent.futures
 from pathlib import Path
 from typing import Optional
 
+from backend.config import SANDBOX_MAX_PAYLOAD, SANDBOX_MAX_OUTPUT, EXEC_TIMEOUT_SECONDS
+
 logger = logging.getLogger("offline_debugger.sandbox")
+
+# Precompiled regex for hot-path traceback extraction
+_LINE_NUMBER_RE = re.compile(r"line (\d+)")
 
 # ---------------------------------------------------------------------------
 # Lazy Docker client — only imported and connected when actually needed.
@@ -77,7 +84,6 @@ def _get_docker_client():
 
     try:
         import docker
-        from docker.errors import DockerException
 
         client = docker.from_env(timeout=10)
         client.ping()  # verify daemon is responsive
@@ -99,7 +105,7 @@ def _get_docker_client():
 # ---------------------------------------------------------------------------
 RUNNER_IMAGE = "python-runner:latest"
 CONTAINER_PREFIX = "sandbox_"
-MAX_OUTPUT_CHARS = 5000
+MAX_OUTPUT_CHARS = SANDBOX_MAX_OUTPUT
 POLL_INTERVAL_SEC = 0.15
 
 
@@ -152,7 +158,7 @@ class SandboxResult:
 
 def _extract_error_line(stderr: str) -> int | None:
     """Extract the last line number mentioned in a Python traceback."""
-    matches = re.findall(r"line (\d+)", stderr)
+    matches = _LINE_NUMBER_RE.findall(stderr)
     return int(matches[-1]) if matches else None
 
 
@@ -172,7 +178,21 @@ def _allow_local_exec_fallback() -> bool:
     return os.getenv("OFFLINE_DEBUGGER_ENV", "development").lower() != "production"
 
 
-def _execute_file_locally(resolved: Path, timeout: int = 10) -> SandboxResult:
+def _execute_file_locally(resolved: Path, timeout: int = EXEC_TIMEOUT_SECONDS) -> SandboxResult:
+    """
+    Fallback execution using the host machine's Python environment.
+    
+    Args:
+        resolved (Path): Absolute path to the user's Python file to rigorously execute.
+        timeout (int): Maximum time in seconds before raising TimeoutError.
+        
+    Returns:
+        SandboxResult: Standardized execution metadata including exact stdout/stderr boundaries.
+        
+    Edge Cases:
+        - Intercepts subprocess.TimeoutExpired to guarantee graceful thread release.
+        - Truncates extreme output (e.g. infinite loops printing to stdout) to MAX_OUTPUT_CHARS.
+    """
     start_time = time.monotonic()
     try:
         completed = subprocess.run(
@@ -231,7 +251,118 @@ def _fallback_or_error(resolved: Path, timeout: int, reason: str) -> SandboxResu
     return SandboxResult(stderr=reason, exit_code=-1, backend="unavailable")
 
 
-def execute_file(file_path: str, timeout: int = 10) -> SandboxResult:
+class PersistentWorkerClient:
+    MAX_PAYLOAD = SANDBOX_MAX_PAYLOAD  # Dynamic payload safety cap
+
+    def __init__(self):
+        self.process = None
+        self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        import threading
+        self.lock = threading.Lock()
+
+    def _start(self):
+        worker_path = Path(__file__).parent / "persistent_worker.py"
+        self.process = subprocess.Popen(
+            [sys.executable, str(worker_path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            bufsize=0,
+        )
+
+    def execute(self, code: str, timeout: int = EXEC_TIMEOUT_SECONDS) -> dict:
+        payload_bytes = json.dumps({"code": code}).encode("utf-8")
+        if len(payload_bytes) > self.MAX_PAYLOAD:
+            return {"success": False, "stdout": "", "stderr": f"Code too large ({len(payload_bytes)} bytes)"}
+
+        def _read():
+            return self.process.stdout.readline()
+
+        try:
+            with self.lock:
+                # Ensure process is alive inside the lock to prevent race conditions
+                if self.process is None or self.process.poll() is not None:
+                    self._start()
+                    
+                # Chunked protocol: send length header then payload
+                header = f"{len(payload_bytes)}\n".encode("utf-8")
+                self.process.stdin.write(header + payload_bytes)
+                self.process.stdin.flush()
+                future = self.pool.submit(_read)
+                line = future.result(timeout=timeout)
+            return json.loads(line.decode("utf-8", errors="replace"))
+        except concurrent.futures.TimeoutError:
+            if self.process:
+                self.process.kill()
+                try:
+                    self.process.wait(timeout=1)
+                except Exception:
+                    pass
+            self.process = None
+            return {"success": False, "stdout": "", "stderr": f"Execution timed out after {timeout} seconds"}
+        except Exception as e:
+            if self.process:
+                self.process.kill()
+                try:
+                    self.process.wait(timeout=1)
+                except Exception:
+                    pass
+            self.process = None
+            return {"success": False, "stdout": "", "stderr": str(e)}
+
+_global_worker = PersistentWorkerClient()
+
+def execute_code_string(code: str, timeout: int = EXEC_TIMEOUT_SECONDS) -> SandboxResult:
+    start_time = time.monotonic()
+    
+    try:
+        import ast
+        ast.parse(code)
+    except SyntaxError as e:
+        return SandboxResult(
+            success=False, stdout="", stderr=f"SyntaxError: {e}",
+            exit_code=1, duration=round(time.monotonic() - start_time, 3),
+            error_type="SyntaxError", backend="syntax_check"
+        )
+        
+    try:
+        res = _global_worker.execute(code, timeout=timeout)
+        success = res.get("success", False)
+        stdout = (res.get("stdout") or "")[-MAX_OUTPUT_CHARS:]
+        stderr = (res.get("stderr") or "")[-MAX_OUTPUT_CHARS:]
+        exit_code = 0 if success else 1
+        
+        return SandboxResult(
+            success=success, stdout=stdout, stderr=stderr,
+            exit_code=exit_code, duration=round(time.monotonic() - start_time, 3),
+            timed_out="Execution timed out" in stderr,
+            error_line=_extract_error_line(stderr) if not success else None,
+            error_type=_extract_error_type(stderr) if not success else None,
+            backend="local_fast",
+        )
+    except Exception as exc:
+        return SandboxResult(
+            success=False, stderr=f"Local execution failed: {exc}",
+            exit_code=-1, duration=round(time.monotonic() - start_time, 3),
+            backend="local_fast",
+        )
+
+def execute_file(file_path: str, timeout: int = EXEC_TIMEOUT_SECONDS) -> SandboxResult:
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            code = f.read()
+            import ast
+            ast.parse(code)
+    except SyntaxError as e:
+        return SandboxResult(
+            success=False,
+            stdout="",
+            stderr=f"SyntaxError: {e}",
+            exit_code=1,
+            error_type="SyntaxError",
+            backend="syntax_check",
+        )
+
     """
     Execute a Python file inside a secure Docker container.
 
@@ -387,7 +518,7 @@ def execute_file(file_path: str, timeout: int = 10) -> SandboxResult:
                 logger.warning("Failed to remove container %s", container_name)
 
 
-def execute_snippet(code: str, timeout: int = 10) -> SandboxResult:
+def execute_snippet(code: str, timeout: int = EXEC_TIMEOUT_SECONDS) -> SandboxResult:
     """
     Execute an ad-hoc code snippet by writing it to a temp file
     and delegating to execute_file.

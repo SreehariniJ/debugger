@@ -52,8 +52,8 @@ export const PipelineExecutionLog = React.memo(({ log, loading }) => {
                 <h4 className="pipeline-trace-title">Pipeline Execution Trace</h4>
             </div>
             <div className="viper-editor-scroll pipeline-trace-scroll">
-                {log.map((entry, i) => (
-                    <div key={i} className="pipeline-trace-entry">
+                {log.slice(-200).map((entry, i) => (
+                    <div key={i} className="pipeline-trace-entry virtual-log" style={{ contentVisibility: 'auto' }}>
                         <span className="pipeline-trace-ts">[{entry.timestamp}]</span>
                         <span style={{ color: entry.level === 'ERROR' ? 'var(--error)' : entry.level === 'WARN' ? 'var(--warning)' : 'var(--accent-secondary)' }}>{entry.level}</span>
                         <span className="pipeline-trace-msg">{entry.message}</span>
