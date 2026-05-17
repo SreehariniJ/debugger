@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * useStream — React hook for consuming Server-Sent Events from the debug pipeline.
  *

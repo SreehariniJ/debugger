@@ -25,7 +25,7 @@ jobs:
           pip install -r requirements-test.txt
 
       - name: Compile check
-        run: python -m compileall app.py src run_app.py desktop_app.py tests
+        run: python -m compileall main.py backend src run_app.py desktop_app.py tests
 
       - name: Run tests
         run: python -m pytest

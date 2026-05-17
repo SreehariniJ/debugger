@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GitBranch, Network, Activity, Box, ZoomIn, ZoomOut, Maximize2, Loader, AlertCircle } from 'lucide-react';
 

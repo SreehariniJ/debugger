@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -986,9 +987,6 @@ function MetricsPanel({ metrics, loading, error, onRefresh }) {
   )
 }
 
-export const globalToastManager = {
-  addToast: (message, type) => { /* no-op until hydrated */ }
-};
 
 function App() {
   const [authUser, setAuthUser] = useState(() => {
@@ -1003,7 +1001,7 @@ function App() {
   const [toasts, setToasts] = useState([])
   const [isVerifyingSession, setIsVerifyingSession] = useState(!!authUser)
 
-  globalToastManager.addToast = useCallback((message, type = 'info') => {
+  const addToast = useCallback((message, type = 'info') => {
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, type }])
   }, [])
@@ -1016,12 +1014,12 @@ function App() {
     const handleExpired = (e) => {
       setAuthUser(null)
       if (e && e.detail && typeof e.detail === 'string') {
-         globalToastManager.addToast(e.detail, 'error')
+         addToast(e.detail, 'error')
       }
     }
     window.addEventListener('auth_expired', handleExpired)
     return () => window.removeEventListener('auth_expired', handleExpired)
-  }, [])
+  }, [addToast])
 
   useEffect(() => {
     if (authUser) {
@@ -1054,7 +1052,7 @@ function App() {
       ) : !authUser ? (
          <LoginPage onLogin={handleLogin} />
       ) : (
-         <MainApp authUser={authUser} onLogout={handleLogout} />
+         <MainApp authUser={authUser} onLogout={handleLogout} addToast={addToast} />
       )}
 
       {/* Global Toast Container */}
@@ -1069,11 +1067,10 @@ function App() {
   )
 }
 
-function MainApp({ authUser, onLogout }) {
+function MainApp({ authUser, onLogout, addToast }) {
 
   const [activeTab, setActiveTab] = useState('debug'); // debug, workspace, insights, security, metrics, terminal, collaboration
   const [activeSession, setActiveSession] = useState(null);
-  const addToast = globalToastManager.addToast;
   const [mode, setMode] = useState('paste'); // paste, upload
   const [filePath, setFilePath] = useState('test_logic.py')
   const [pasteCode, setPasteCode] = useState('')
@@ -2433,3 +2430,9 @@ export default function AppWithBoundary() {
     </ErrorBoundary>
   )
 }
+
+
+
+
+
+

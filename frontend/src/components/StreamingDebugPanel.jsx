@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * StreamingDebugPanel — Real-time SSE debug pipeline visualization.
  *

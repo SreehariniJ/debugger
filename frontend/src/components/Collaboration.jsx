@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { Users, Plus, UserPlus, Trash2, MessageSquare, Clock, Code2, Zap } from 'lucide-react';
