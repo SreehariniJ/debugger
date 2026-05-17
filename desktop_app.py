@@ -23,7 +23,11 @@ BACKEND_HOST = "127.0.0.1"
 BACKEND_PORT = int(os.getenv("OFFLINE_DEBUGGER_PORT", "8000"))
 BACKEND_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
 HEALTH_URL = f"{BACKEND_URL}/health"
-PROJECT_ROOT = Path(__file__).resolve().parent
+if getattr(sys, 'frozen', False):
+    PROJECT_ROOT = Path(sys._MEIPASS)
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent
+
 FRONTEND_INDEX = PROJECT_ROOT / "frontend" / "dist" / "index.html"
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_FILE = LOG_DIR / "desktop.log"

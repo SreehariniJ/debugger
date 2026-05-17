@@ -48,12 +48,19 @@ def _env_float(name: str, default: float, minimum: float | None = None) -> float
 def _resolve_runtime_path(raw_path: str) -> Path:
     candidate = Path(raw_path).expanduser()
     if not candidate.is_absolute():
-        candidate = PROJECT_ROOT / candidate
+        candidate = APP_ROOT / candidate
     return candidate.resolve()
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-WORKSPACE_CONFIG_FILE = PROJECT_ROOT / ".workspace_root"
+import sys
+if getattr(sys, 'frozen', False):
+    PROJECT_ROOT = Path(sys._MEIPASS)
+    APP_ROOT = Path(sys.executable).parent
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    APP_ROOT = PROJECT_ROOT
+
+WORKSPACE_CONFIG_FILE = APP_ROOT / ".workspace_root"
 
 def _get_initial_workspace() -> Path:
     # 1. Check environment variable
