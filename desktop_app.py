@@ -11,7 +11,7 @@ from pathlib import Path
 
 import uvicorn
 
-from app import app
+from main import app
 
 try:
     import webview
