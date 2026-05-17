@@ -40,10 +40,14 @@ def build() -> None:
     ensure_pyinstaller()
     ensure_frontend_dist()
 
+    import llama_cpp
+    llama_cpp_path = os.path.dirname(llama_cpp.__file__)
+
     sep = os.pathsep
     add_data = [
         f"{PROJECT_ROOT / 'frontend' / 'dist'}{sep}frontend/dist",
         f"{PROJECT_ROOT / 'knowledge_base'}{sep}knowledge_base",
+        f"{llama_cpp_path}/lib{sep}llama_cpp/lib",
     ]
 
     cmd = [
@@ -52,11 +56,14 @@ def build() -> None:
         "PyInstaller",
         "--noconfirm",
         "--clean",
-        "--windowed",
         "--name",
         "OfflineDebugger",
         "--collect-submodules",
         "webview",
+        "--hidden-import",
+        "passlib.handlers.bcrypt",
+        "--paths",
+        "src",
     ]
     for item in add_data:
         cmd.extend(["--add-data", item])
