@@ -57,6 +57,39 @@ from backend.config import SANDBOX_MAX_PAYLOAD, SANDBOX_MAX_OUTPUT, EXEC_TIMEOUT
 
 logger = logging.getLogger("offline_debugger.sandbox")
 
+
+def _find_python_exe() -> str:
+    """Return the path to a real Python interpreter.
+
+    When running inside a PyInstaller bundle ``sys.executable`` points to the
+    frozen .exe (e.g. OfflineDebugger.exe) rather than a Python interpreter.
+    We fall back to the system Python found on PATH.
+    """
+    if not getattr(sys, 'frozen', False):
+        return sys.executable
+
+    import shutil
+    for name in ('python', 'python3', 'py'):
+        found = shutil.which(name)
+        if found:
+            logger.info("Frozen env: using system Python at %s", found)
+            return found
+
+    # Last resort: try well-known Windows locations
+    for candidate in (
+        Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs' / 'Python' / 'Python313' / 'python.exe',
+        Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs' / 'Python' / 'Python312' / 'python.exe',
+        Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs' / 'Python' / 'Python311' / 'python.exe',
+    ):
+        if candidate.exists():
+            logger.info("Frozen env: using Python at %s", candidate)
+            return str(candidate)
+
+    raise RuntimeError(
+        "Cannot find a Python interpreter. "
+        "Please ensure Python is installed and available on your system PATH."
+    )
+
 # Precompiled regex for hot-path traceback extraction
 _LINE_NUMBER_RE = re.compile(r"line (\d+)")
 
@@ -196,7 +229,7 @@ def _execute_file_locally(resolved: Path, timeout: int = EXEC_TIMEOUT_SECONDS) -
     start_time = time.monotonic()
     try:
         completed = subprocess.run(
-            [sys.executable, str(resolved)],
+            [_find_python_exe(), str(resolved)],
             cwd=str(resolved.parent),
             capture_output=True,
             text=True,
@@ -263,7 +296,7 @@ class PersistentWorkerClient:
     def _start(self):
         worker_path = Path(__file__).parent / "persistent_worker.py"
         self.process = subprocess.Popen(
-            [sys.executable, str(worker_path)],
+            [_find_python_exe(), str(worker_path)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             bufsize=0,

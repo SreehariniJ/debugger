@@ -48,6 +48,7 @@ def build() -> None:
         f"{PROJECT_ROOT / 'frontend' / 'dist'}{sep}frontend/dist",
         f"{PROJECT_ROOT / 'knowledge_base'}{sep}knowledge_base",
         f"{llama_cpp_path}/lib{sep}llama_cpp/lib",
+        f"{PROJECT_ROOT / 'backend' / 'services' / 'persistent_worker.py'}{sep}backend/services",
     ]
 
     cmd = [
